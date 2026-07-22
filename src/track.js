@@ -19,8 +19,10 @@ export function createLevel() {
       spikeTrap('landing-spikes', 1510, 1770, 610, 105, 0),
       pressureTrap('inspection-blast', 2210, 2490, 590, 1),
       spikeTrap('vision-spikes', 2870, 3090, 640, 135, 1),
+      swingCap('vision-cowl', 3210, 3345, 564, -1, 1),
       fallingPipe('falling-offset', 4050, 4320, 170, 690, 74, 105, 1),
       spikeTrap('fsa-landing', 4740, 4930, 630, 140, 2),
+      swingCap('industry-cowl', 4960, 5190, 554, -1, 2),
       pressureTrap('industrial-blast', 5200, 5350, 500, 2),
       spikeTrap('fake-finish', 5970, 6240, 670, 135, 2),
       fallingPipe('last-pipe', 6660, 6860, 110, 620, 92, 110, 2)
@@ -31,9 +33,13 @@ export function createLevel() {
       { id: 'cp-industry', x: 6110, y: 670, label: 'JEREMIAS SERVICEPUNKT 03', active: false }
     ],
     bands: [
-      band(380, 610), band(1280, 540), band(1870, 490), band(2360, 565),
-      band(2980, 520), band(3660, 410), band(4220, 555), band(5000, 505),
-      band(5600, 410), band(6030, 535), band(6740, 485), band(7020, 475)
+      band(380, 610), band(1280, 540, { motion: 'railX', amplitude: 58, speed: 1.5 }),
+      band(1870, 490), band(2360, 565), band(2980, 520),
+      band(3660, 410, { motion: 'railY', amplitude: 44, speed: 1.8 }),
+      band(4220, 555), band(5000, 505),
+      band(5600, 410, { motion: 'flee', triggerX: 5420, travel: 135 }),
+      band(6030, 535), band(6740, 485, { motion: 'railX', amplitude: 65, speed: 2.1 }),
+      band(7020, 475)
     ],
     finish: { x: 7140, y: 620 }
   };
@@ -58,8 +64,16 @@ function pressureTrap(id, triggerX, x, y, section) {
   return { id, type: 'pressure', triggerX, x, y, width: 170, height: 150, section, triggered: false, timer: 0 };
 }
 
-function band(x, y) {
-  return { x, y, collected: false };
+function swingCap(id, triggerX, x, y, direction, section) {
+  return {
+    id, type: 'swingCap', triggerX, x, baseX: x, y, width: 92, height: 76,
+    direction, section, triggered: false, cleared: false, phase: 'idle', timer: 0,
+    vx: direction * 390, angle: 0
+  };
+}
+
+function band(x, y, extras = {}) {
+  return { x, y, baseX: x, baseY: y, collected: false, motion: 'float', activated: false, ...extras };
 }
 
 export function overlaps(a, b) {
@@ -72,6 +86,9 @@ export function activeTrapBox(trap) {
   }
   if (trap.type === 'fallingPipe' && trap.triggered && !trap.cleared) {
     return { x: trap.x, y: trap.y, width: trap.width, height: trap.height };
+  }
+  if (trap.type === 'swingCap' && trap.phase === 'launching' && !trap.cleared) {
+    return { x: trap.x + 7, y: trap.y + 7, width: trap.width - 14, height: trap.height - 12 };
   }
   return null;
 }

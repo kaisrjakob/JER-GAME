@@ -1,4 +1,7 @@
-import { LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, SECTIONS, VIEW_HEIGHT, VIEW_WIDTH, sectionIndexForX } from './config.js';
+import {
+  GAME_ASSETS, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, SECTIONS, VIEW_HEIGHT,
+  VIEW_WIDTH, sectionIndexForX
+} from './config.js';
 
 export class UnfairRenderer {
   constructor(canvas, settings) {
@@ -7,6 +10,9 @@ export class UnfairRenderer {
     this.settings = settings;
     this.images = [];
     this.logo = null;
+    this.clampBand = null;
+    this.dwPipe = null;
+    this.rainCap = null;
     this.particles = [];
     this.width = 1;
     this.height = 1;
@@ -16,7 +22,10 @@ export class UnfairRenderer {
   }
 
   async load(progress = () => {}) {
-    const sources = [...SECTIONS.map((section) => section.asset), 'assets/jeremias-logo.png'];
+    const sources = [
+      ...SECTIONS.map((section) => section.asset), 'assets/jeremias-logo.png',
+      GAME_ASSETS.clampBand, GAME_ASSETS.dwPipe, GAME_ASSETS.rainCap
+    ];
     let loaded = 0;
     const images = await Promise.all(sources.map((source) => new Promise((resolve, reject) => {
       const image = new Image();
@@ -30,6 +39,9 @@ export class UnfairRenderer {
     })));
     this.images = images.slice(0, 3);
     this.logo = images[3];
+    this.clampBand = images[4];
+    this.dwPipe = images[5];
+    this.rainCap = images[6];
   }
 
   resize() {
@@ -151,21 +163,16 @@ export class UnfairRenderer {
       if (band.collected) continue;
       const x = this.worldX(band.x, state);
       if (x < -70 || x > VIEW_WIDTH + 70) continue;
-      const y = band.y + Math.sin(time * .006 + band.x) * 8;
+      const y = band.y;
       ctx.save();
       ctx.translate(x, y);
-      ctx.rotate(time * .0015);
+      ctx.rotate(Math.sin(time * .003 + band.baseX) * .08);
       ctx.shadowColor = '#ff7a1a';
-      ctx.shadowBlur = 16;
-      ctx.strokeStyle = '#ff922f';
-      ctx.lineWidth = 9;
-      ctx.beginPath();
-      ctx.arc(0, 0, 24, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = '#fff';
-      ctx.font = '800 11px "Barlow Condensed",sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('DW', 0, 4);
+      ctx.shadowBlur = 18;
+      ctx.drawImage(this.clampBand, -46, -30, 92, 60);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,126,28,.85)';
+      ctx.beginPath(); ctx.arc(0, 1, 4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
     }
   }
@@ -199,6 +206,7 @@ export class UnfairRenderer {
     for (const trap of state.level.traps) {
       if (trap.type === 'spikes') this.drawSpikes(trap, state);
       else if (trap.type === 'fallingPipe') this.drawFallingPipe(trap, state);
+      else if (trap.type === 'swingCap') this.drawSwingCap(trap, state);
       else this.drawPressure(trap, state, time);
     }
     const ctx = this.ctx;
@@ -240,24 +248,37 @@ export class UnfairRenderer {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
     if (x < -180 || x > VIEW_WIDTH + 180) return;
-    const steel = ctx.createLinearGradient(x, 0, x + trap.width, 0);
-    steel.addColorStop(0, '#334c60');
-    steel.addColorStop(.23, '#e1ebef');
-    steel.addColorStop(.52, '#71899a');
-    steel.addColorStop(.78, '#f5f8f9');
-    steel.addColorStop(1, '#294155');
-    ctx.fillStyle = steel;
-    ctx.fillRect(x, trap.y, trap.width, trap.height);
-    ctx.fillStyle = '#344f64';
-    for (let y = trap.y + 35; y < trap.y + trap.height; y += 55) ctx.fillRect(x - 5, y, trap.width + 10, 8);
+    if (!trap.triggered) return;
+    const housingY = trap.startY - 28;
+    ctx.fillStyle = '#172b3d';
+    ctx.fillRect(x - 18, housingY, trap.width + 36, 28);
+    ctx.fillStyle = '#869aa8';
+    ctx.fillRect(x - 12, housingY + 5, trap.width + 24, 9);
+    ctx.fillStyle = '#ff7a1a';
+    for (let stripe = x - 10; stripe < x + trap.width + 8; stripe += 22) ctx.fillRect(stripe, housingY + 18, 11, 5);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.65)';
+    ctx.shadowBlur = 10;
+    ctx.drawImage(this.dwPipe, x - 7, trap.y - 5, trap.width + 14, trap.height + 10);
+    ctx.restore();
+  }
+
+  drawSwingCap(trap, state) {
+    if (trap.cleared) return;
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -180 || x > VIEW_WIDTH + 180) return;
     ctx.save();
     ctx.translate(x + trap.width / 2, trap.y + trap.height / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillStyle = '#0b5f9e';
-    ctx.font = '800 18px "Barlow Condensed",sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(trap.section === 2 ? 'FSA-X // JEREMIAS' : 'DW-FU // JEREMIAS', 0, 6);
+    ctx.rotate(trap.angle);
+    ctx.shadowColor = 'rgba(0,0,0,.6)';
+    ctx.shadowBlur = 12;
+    ctx.drawImage(this.rainCap, -trap.width / 2, -trap.height / 2, trap.width, trap.height);
     ctx.restore();
+    if (trap.phase === 'idle') {
+      ctx.fillStyle = '#486175';
+      ctx.fillRect(x + 34, trap.y + trap.height - 2, 24, 18);
+    }
   }
 
   drawPressure(trap, state, time) {

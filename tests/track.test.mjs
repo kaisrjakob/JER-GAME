@@ -45,6 +45,7 @@ test('trap hitboxes activate only when the unfair surprise is live', () => {
   const level = createLevel();
   const spikes = level.traps.find((trap) => trap.type === 'spikes');
   const pipe = level.traps.find((trap) => trap.type === 'fallingPipe');
+  const cap = level.traps.find((trap) => trap.type === 'swingCap');
   assert.equal(activeTrapBox(spikes), null);
   spikes.progress = 0.56;
   assert.ok(activeTrapBox(spikes).height > 0);
@@ -55,6 +56,9 @@ test('trap hitboxes activate only when the unfair surprise is live', () => {
   });
   pipe.cleared = true;
   assert.equal(activeTrapBox(pipe), null);
+  assert.equal(activeTrapBox(cap), null);
+  cap.phase = 'launching';
+  assert.ok(activeTrapBox(cap));
 });
 
 test('every fallen pipe can be cleared by the configured jump', () => {
@@ -76,6 +80,28 @@ test('every raised chimney-cap spike field can be jumped', () => {
     assert.ok(spike.height < jumpRise, `${spike.id} is too high to jump`);
     assert.ok(spike.width + PLAYER_WIDTH < RUN_SPEED * airTime, `${spike.id} is too wide to jump`);
   }
+});
+
+test('every launched chimney cap is jumpable and eventually leaves the route', () => {
+  const level = createLevel();
+  const caps = level.traps.filter((trap) => trap.type === 'swingCap');
+  const jumpRise = JUMP_SPEED ** 2 / (2 * GRAVITY);
+  const horizontalRange = RUN_SPEED * 2 * JUMP_SPEED / GRAVITY;
+  assert.equal(caps.length, 2);
+  for (const cap of caps) {
+    assert.ok(cap.triggerX < cap.baseX, `${cap.id} needs warning distance`);
+    assert.ok(cap.height < jumpRise, `${cap.id} is too tall to jump`);
+    assert.ok(cap.width + PLAYER_WIDTH < horizontalRange, `${cap.id} is too wide to jump`);
+    assert.ok(cap.vx < 0, `${cap.id} must leave the route after activation`);
+  }
+});
+
+test('collectibles include realistic movement patterns with a bounded runaway band', () => {
+  const bands = createLevel().bands;
+  assert.ok(bands.some((band) => band.motion === 'railX'));
+  assert.ok(bands.some((band) => band.motion === 'railY'));
+  const runaway = bands.find((band) => band.motion === 'flee');
+  assert.ok(runaway.travel > 0 && runaway.travel < 150);
 });
 
 test('every gap between consecutive platforms is reachable', () => {

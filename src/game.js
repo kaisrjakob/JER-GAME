@@ -175,6 +175,7 @@ export class UnfairJeremias {
 
     this.updatePlatforms(dt);
     this.updateTraps(dt);
+    this.updateBands(dt);
 
     player.x += player.vx * dt;
     player.x = Math.max(-100, player.x);
@@ -240,6 +241,7 @@ export class UnfairJeremias {
       if (!trap.triggered && playerX >= trap.triggerX) {
         trap.triggered = true;
         if (trap.type === 'fallingPipe') trap.phase = 'falling';
+        if (trap.type === 'swingCap') trap.phase = 'arming';
         if (trap.type === 'spikes') this.audio.sfx('near');
       }
       if (!trap.triggered) continue;
@@ -266,6 +268,46 @@ export class UnfairJeremias {
         }
       }
       if (trap.type === 'pressure') trap.timer += dt;
+      if (trap.type === 'swingCap') {
+        if (trap.phase === 'arming') {
+          trap.timer += dt;
+          trap.angle = Math.sin(trap.timer * 80) * .06;
+          if (trap.timer >= .16) {
+            trap.phase = 'launching';
+            this.audio.sfx('near');
+          }
+        } else if (trap.phase === 'launching') {
+          trap.x += trap.vx * dt;
+          trap.angle += trap.direction * dt * 8.5;
+          if (Math.abs(trap.x - trap.baseX) > 470) {
+            trap.phase = 'cleared';
+            trap.cleared = true;
+          }
+        }
+      }
+    }
+  }
+
+  updateBands(dt) {
+    const elapsed = this.state.elapsed;
+    const playerX = this.state.player.x;
+    for (const band of this.state.level.bands) {
+      if (band.collected) continue;
+      if (band.motion === 'railX') {
+        band.x = band.baseX + Math.sin(elapsed * band.speed + band.baseX) * band.amplitude;
+        band.y = band.baseY + Math.cos(elapsed * band.speed * .7) * 6;
+      } else if (band.motion === 'railY') {
+        band.y = band.baseY + Math.sin(elapsed * band.speed) * band.amplitude;
+      } else if (band.motion === 'flee') {
+        if (!band.activated && playerX >= band.triggerX) {
+          band.activated = true;
+          this.callout('DAS KLEMMBAND HAUT AB!');
+        }
+        if (band.activated) band.x = Math.min(band.baseX + band.travel, band.x + 175 * dt);
+        band.y = band.baseY + Math.sin(elapsed * 8) * 5;
+      } else {
+        band.y = band.baseY + Math.sin(elapsed * 2.8 + band.baseX * .01) * 8;
+      }
     }
   }
 
@@ -276,9 +318,10 @@ export class UnfairJeremias {
     for (const trap of state.level.traps) {
       const box = activeTrapBox(trap);
       if (box && overlaps(playerBox, box)) {
-        this.kill(trap.type === 'spikes'
-          ? 'KAMINHAUBE VON UNTEN. GEMEIN.'
-          : 'DW-ELEMENT IM ANFLUG — SPRINGEN ODER WARTEN, BIS ES HOCHGEZOGEN WIRD');
+        let reason = 'DW-ELEMENT IM ANFLUG — SPRINGEN ODER WARTEN, BIS ES HOCHGEZOGEN WIRD';
+        if (trap.type === 'spikes') reason = 'KAMINHAUBE VON UNTEN. GEMEIN.';
+        if (trap.type === 'swingCap') reason = 'DIE KAMINHAUBE WAR WOHL NICHT FEST VERSCHRAUBT';
+        this.kill(reason);
         return;
       }
       if (trap.type === 'pressure' && trap.triggered && trap.timer > .28 && trap.timer < 1.1) {

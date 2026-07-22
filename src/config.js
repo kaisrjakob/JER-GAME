@@ -7,6 +7,12 @@ export const GRAVITY = 2050;
 export const JUMP_SPEED = 760;
 export const RUN_SPEED = 330;
 
+export const GAME_ASSETS = {
+  clampBand: 'assets/game/clamp-band.png',
+  dwPipe: 'assets/game/dw-pipe.png',
+  rainCap: 'assets/game/rain-cap.png'
+};
+
 export const STORAGE_KEYS = {
   highScore: 'jeremias-unfair-service.bestScore.v1',
   settings: 'jeremias-unfair-service.settings.v1',

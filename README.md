@@ -21,6 +21,9 @@ Auf Touch-Geräten stehen große Links-, Rechts- und Sprungtasten bereit. Das Zi
 - Sammelobjekte als orange Jeremias-Klemmbänder
 - Checkpoints als Jeremias-Servicepunkte mit Firmenlogo
 - Fallen aus Kaminhauben, DW-Elementen und Prüföffnungen
+- Realistisch freigestellte Edelstahl-Bauteile statt gezeichneter Platzhalter
+- Bewegliche, flüchtende und vertikal verfahrende Klemmband-Sammelobjekte
+- Seitlich losschießende Kaminhauben und bis zur Auslösung verborgene Rohrmagazine
 - Zielbauwerk als großer, gebrandeter FSA-X-Industrieschornstein
 
 Jede Falle besitzt mindestens einen reproduzierbaren Lösungsweg. Fallende DW-Elemente sind niedriger als die maximale Sprunghöhe und werden zusätzlich nach kurzer Zeit wieder eingezogen.
@@ -52,3 +55,4 @@ Canvas 2D rendert das Level mit festem Simulationsschritt. Musik und Effekte ent
 - Produktreferenz Doppelwandiger Edelstahlschornstein: https://jeremias.de/edelstahlschornstein
 - Systemreferenz Industrieschornstein: https://jeremias.de/industrieschornstein
 - Die drei text- und logofreien Hintergrundwelten wurden für dieses Projekt mit OpenAIs eingebauter Bildgenerierung erstellt und lokal optimiert.
+- Die freigestellten Sprites für Klemmband, DW-Rohrelement und Kaminhaube wurden ebenfalls mit der eingebauten Bildgenerierung als realistische Produktmotive erstellt, per Chroma-Key freigestellt und lokal optimiert.

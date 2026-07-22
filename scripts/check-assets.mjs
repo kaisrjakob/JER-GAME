@@ -16,6 +16,7 @@ for (const source of [html, css, config]) {
   }
 }
 for (const match of config.matchAll(/asset:\s*['"]([^'"]+)['"]/g)) references.add(match[1]);
+for (const match of config.matchAll(/['"](assets\/[^'"]+)['"]/g)) references.add(match[1]);
 for (const reference of references) await access(resolve(root, reference));
 const idsBlock = game.match(/const ids = \[([\s\S]*?)\];/);
 if (!idsBlock) throw new Error('Could not locate the UI id registry.');
