@@ -1,341 +1,398 @@
-import { TAU, WORLDS, worldIndexForDistance } from './config.js';
+import { LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, SECTIONS, VIEW_HEIGHT, VIEW_WIDTH, sectionIndexForX } from './config.js';
 
-const CAMERA_DEPTH = 255;
-const VIEW_DISTANCE = 2450;
-
-export class TunnelRenderer {
+export class UnfairRenderer {
   constructor(canvas, settings) {
     this.canvas = canvas;
-    this.context = canvas.getContext('2d', { alpha: false });
+    this.ctx = canvas.getContext('2d', { alpha: false });
     this.settings = settings;
+    this.images = [];
+    this.logo = null;
+    this.particles = [];
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
-    this.images = [];
-    this.particles = [];
-    this.resize = this.resize.bind(this);
-    window.addEventListener('resize', this.resize);
+    addEventListener('resize', () => this.resize());
     this.resize();
   }
 
   async load(progress = () => {}) {
+    const sources = [...SECTIONS.map((section) => section.asset), 'assets/jeremias-logo.png'];
     let loaded = 0;
-    this.images = await Promise.all(WORLDS.map((world) => new Promise((resolve, reject) => {
+    const images = await Promise.all(sources.map((source) => new Promise((resolve, reject) => {
       const image = new Image();
       image.onload = () => {
         loaded += 1;
-        progress(loaded / WORLDS.length);
+        progress(loaded / sources.length);
         resolve(image);
       };
       image.onerror = reject;
-      image.src = world.asset;
+      image.src = source;
     })));
+    this.images = images.slice(0, 3);
+    this.logo = images[3];
   }
 
   resize() {
     this.width = Math.max(1, this.canvas.clientWidth);
     this.height = Math.max(1, this.canvas.clientHeight);
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    this.dpr = Math.min(2, devicePixelRatio || 1);
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
-    this.context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
   render(state, time) {
-    const ctx = this.context;
-    const worldIndex = worldIndexForDistance(state.distance);
-    const world = WORLDS[worldIndex];
-    const shake = state.hitTimer > 0 && !this.settings.reducedMotion ? state.hitTimer * 8 : 0;
-    const shakeX = shake ? (Math.random() - 0.5) * shake : 0;
-    const shakeY = shake ? (Math.random() - 0.5) * shake : 0;
-    ctx.save();
-    ctx.translate(shakeX, shakeY);
-    this.drawBackground(worldIndex, state, time);
-    this.drawSpeedLines(state, time);
-    this.drawTunnel(world, state, time);
-    this.drawObjects(state);
+    const ctx = this.ctx;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = '#020814';
+    ctx.fillRect(0, 0, this.width, this.height);
+    this.drawBackdrop(state);
+    const scale = Math.min(this.width / VIEW_WIDTH, this.height / VIEW_HEIGHT);
+    const offsetX = (this.width - VIEW_WIDTH * scale) * 0.5;
+    const offsetY = (this.height - VIEW_HEIGHT * scale) * 0.5;
+    ctx.setTransform(this.dpr * scale, 0, 0, this.dpr * scale, offsetX * this.dpr, offsetY * this.dpr);
+    this.drawParallax(state);
+    this.drawPlatforms(state, time);
+    this.drawCheckpoints(state, time);
+    this.drawBands(state, time);
+    this.drawTraps(state, time);
+    this.drawFinish(state, time);
     this.drawParticles(state);
-    this.drawRider(state, time);
-    ctx.restore();
+    this.drawPlayer(state, time);
+    this.drawVignette();
   }
 
-  drawBackground(worldIndex, state, time) {
-    const ctx = this.context;
-    const image = this.images[worldIndex];
+  drawBackdrop(state) {
+    const ctx = this.ctx;
+    const index = sectionIndexForX(state.player.x);
+    const image = this.images[index];
     const scale = Math.max(this.width / image.width, this.height / image.height);
     const width = image.width * scale;
     const height = image.height * scale;
-    const parallax = this.settings.reducedMotion ? 0 : Math.sin(state.angle) * 18;
-    ctx.drawImage(image, (this.width - width) * 0.5 + parallax, (this.height - height) * 0.5, width, height);
-    const gradient = ctx.createRadialGradient(this.width * 0.5, this.height * 0.5, 10, this.width * 0.5, this.height * 0.5, Math.max(this.width, this.height) * 0.75);
-    gradient.addColorStop(0, 'rgba(3,14,31,.68)');
-    gradient.addColorStop(0.55, 'rgba(2,10,23,.88)');
-    gradient.addColorStop(1, 'rgba(1,5,13,.98)');
+    const parallax = this.settings.reducedMotion ? 0 : -(state.cameraX * 0.025) % 100;
+    ctx.drawImage(image, (this.width - width) / 2 + parallax, (this.height - height) / 2, width, height);
+    const gradient = ctx.createLinearGradient(0, 0, 0, this.height);
+    gradient.addColorStop(0, 'rgba(1,8,20,.48)');
+    gradient.addColorStop(.48, 'rgba(3,16,34,.73)');
+    gradient.addColorStop(1, 'rgba(2,7,15,.97)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, this.width, this.height);
-    ctx.fillStyle = 'rgba(11,60,105,' + (0.05 + Math.sin(time * 0.0004) * 0.02) + ')';
-    ctx.fillRect(0, 0, this.width, this.height);
   }
 
-  centerAt(z, state) {
-    const progress = 1 - Math.min(1, z / VIEW_DISTANCE);
-    const world = worldIndexForDistance(state.distance);
-    const bend = world === 0 ? 0.022 : world === 1 ? 0.055 : 0.038;
-    return {
-      x: this.width * 0.5 + Math.sin((state.distance + z) * bend * 0.012) * this.width * 0.12 * progress,
-      y: this.height * 0.5 + Math.cos((state.distance + z) * bend * 0.009) * this.height * 0.075 * progress
-    };
+  worldX(x, state) {
+    return x - state.cameraX;
   }
 
-  radiusAt(z) {
-    const perspective = CAMERA_DEPTH / Math.max(1, z + CAMERA_DEPTH);
-    const farRadius = Math.min(this.width, this.height) * 0.035;
-    const nearRadius = Math.max(this.width, this.height) * 0.82;
-    return farRadius + (nearRadius - farRadius) * perspective;
-  }
-
-  project(z, angle, radial, state) {
-    const center = this.centerAt(z, state);
-    const radius = this.radiusAt(z) * radial;
-    return {
-      x: center.x + Math.cos(angle) * radius,
-      y: center.y + Math.sin(angle) * radius * 0.68,
-      radius
-    };
-  }
-
-  drawTunnel(world, state, time) {
-    const ctx = this.context;
-    const spacing = world.ringSpacing;
-    const offset = state.distance % spacing;
-    const roll = state.distance * 0.0014;
-    for (let z = VIEW_DISTANCE - offset; z > 18; z -= spacing) {
-      const radius = this.radiusAt(z);
-      const center = this.centerAt(z, state);
-      const alpha = Math.max(0.035, Math.min(0.34, 1 - z / VIEW_DISTANCE));
-      ctx.strokeStyle = hexToRgba(world.colors[2], alpha);
-      ctx.lineWidth = Math.max(0.6, 3.5 * CAMERA_DEPTH / (z + CAMERA_DEPTH));
+  drawParallax(state) {
+    const ctx = this.ctx;
+    for (let layer = 0; layer < 3; layer += 1) {
+      const base = 535 + layer * 55;
+      const speed = .08 + layer * .07;
+      ctx.fillStyle = 'rgba(' + (10 + layer * 8) + ',' + (29 + layer * 11) + ',' + (49 + layer * 17) + ',' + (.78 - layer * .16) + ')';
       ctx.beginPath();
-      ctx.ellipse(center.x, center.y, radius, radius * 0.68, 0, 0, TAU);
-      ctx.stroke();
-      if (z % (spacing * 4) < spacing) {
-        ctx.strokeStyle = 'rgba(255,122,26,' + alpha * 0.75 + ')';
-        ctx.beginPath();
-        ctx.ellipse(center.x, center.y, radius, radius * 0.68, 0, roll, roll + 0.55);
-        ctx.stroke();
+      ctx.moveTo(0, VIEW_HEIGHT);
+      for (let i = -2; i < 15; i += 1) {
+        const x = i * 145 - (state.cameraX * speed) % 145;
+        const h = 70 + ((i * 61 + layer * 43) % 150);
+        ctx.lineTo(x, base - h);
+        ctx.lineTo(x + 105, base - h);
+        ctx.lineTo(x + 105, VIEW_HEIGHT);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  drawPlatforms(state, time) {
+    const ctx = this.ctx;
+    for (const platform of state.level.platforms) {
+      const x = this.worldX(platform.x, state);
+      const y = platform.y + platform.fallY;
+      if (x > VIEW_WIDTH + 100 || x + platform.width < -100 || y > VIEW_HEIGHT + 150) continue;
+      const section = SECTIONS[platform.section];
+      const body = ctx.createLinearGradient(0, y, 0, VIEW_HEIGHT);
+      body.addColorStop(0, '#1d3449');
+      body.addColorStop(.08, '#0f2337');
+      body.addColorStop(1, '#06101e');
+      ctx.fillStyle = body;
+      ctx.fillRect(x, y, platform.width, VIEW_HEIGHT - y + 100);
+      const steel = ctx.createLinearGradient(0, y - 18, 0, y + 12);
+      steel.addColorStop(0, '#f4f7f8');
+      steel.addColorStop(.22, '#617c90');
+      steel.addColorStop(.58, '#dce8ed');
+      steel.addColorStop(1, '#2e465b');
+      ctx.fillStyle = steel;
+      ctx.fillRect(x, y - 18, platform.width, 24);
+      ctx.fillStyle = '#344e63';
+      for (let clampX = x + 85; clampX < x + platform.width; clampX += 150) {
+        ctx.fillRect(clampX, y - 22, 11, 32);
+        ctx.fillStyle = '#c5d4dc';
+        ctx.fillRect(clampX + 3, y - 22, 3, 32);
+        ctx.fillStyle = '#344e63';
+      }
+      ctx.fillStyle = 'rgba(181,214,234,.25)';
+      ctx.font = '700 15px "Barlow Condensed",sans-serif';
+      ctx.fillText(section.title + ' // JEREMIAS', x + 28, y + 43);
+      if (platform.moving) {
+        ctx.strokeStyle = '#ff8624';
+        ctx.setLineDash([8, 8]);
+        ctx.strokeRect(x + 8, y - 27, platform.width - 16, 42);
+        ctx.setLineDash([]);
+      }
+      if (platform.collapsible && platform.triggered && platform.timer < .6) {
+        ctx.fillStyle = 'rgba(255,122,26,' + (.15 + Math.sin(time * .03) * .1) + ')';
+        ctx.fillRect(x, y - 18, platform.width, 45);
       }
     }
+  }
 
-    const ribs = 12;
-    for (let index = 0; index < ribs; index += 1) {
-      const angle = index / ribs * TAU + roll;
-      const far = this.project(VIEW_DISTANCE, angle, 1, state);
-      const near = this.project(30, angle, 1, state);
-      const gradient = ctx.createLinearGradient(far.x, far.y, near.x, near.y);
-      gradient.addColorStop(0, 'rgba(94,157,211,.02)');
-      gradient.addColorStop(1, index % 3 === 0 ? 'rgba(255,132,39,.18)' : 'rgba(128,188,239,.12)');
-      ctx.strokeStyle = gradient;
-      ctx.lineWidth = index % 3 === 0 ? 2 : 1;
+  drawBands(state, time) {
+    const ctx = this.ctx;
+    for (const band of state.level.bands) {
+      if (band.collected) continue;
+      const x = this.worldX(band.x, state);
+      if (x < -70 || x > VIEW_WIDTH + 70) continue;
+      const y = band.y + Math.sin(time * .006 + band.x) * 8;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(time * .0015);
+      ctx.shadowColor = '#ff7a1a';
+      ctx.shadowBlur = 16;
+      ctx.strokeStyle = '#ff922f';
+      ctx.lineWidth = 9;
       ctx.beginPath();
-      ctx.moveTo(far.x, far.y);
-      ctx.lineTo(near.x, near.y);
+      ctx.arc(0, 0, 24, 0, Math.PI * 2);
       ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 11px "Barlow Condensed",sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('DW', 0, 4);
+      ctx.restore();
     }
-
-    const vignette = ctx.createRadialGradient(this.width / 2, this.height / 2, Math.min(this.width, this.height) * 0.25, this.width / 2, this.height / 2, Math.max(this.width, this.height) * 0.7);
-    vignette.addColorStop(0, 'rgba(0,0,0,0)');
-    vignette.addColorStop(1, 'rgba(0,4,12,.62)');
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, this.width, this.height);
   }
 
-  drawSpeedLines(state, time) {
-    if (this.settings.reducedMotion) return;
-    const ctx = this.context;
-    const count = 20 + Math.floor((state.speed - 60) * 0.35);
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    for (let i = 0; i < count; i += 1) {
-      const phase = ((i * 97.31 + state.distance * (1.2 + i % 4 * 0.08)) % 1100) / 1100;
-      const angle = (i * 2.399 + time * 0.00003) % TAU;
-      const r1 = Math.min(this.width, this.height) * (0.08 + phase * 0.55);
-      const r2 = r1 + 18 + state.speed * 0.18;
-      const cx = this.width * 0.5;
-      const cy = this.height * 0.5;
-      ctx.strokeStyle = i % 5 === 0 ? 'rgba(255,133,42,.24)' : 'rgba(110,190,255,.14)';
-      ctx.lineWidth = phase * 2;
+  drawCheckpoints(state, time) {
+    const ctx = this.ctx;
+    for (const checkpoint of state.level.checkpoints) {
+      const x = this.worldX(checkpoint.x, state);
+      if (x < -150 || x > VIEW_WIDTH + 150) continue;
+      ctx.strokeStyle = checkpoint.active ? '#43e39a' : '#0d83d5';
+      ctx.lineWidth = 8;
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(angle) * r1, cy + Math.sin(angle) * r1 * 0.68);
-      ctx.lineTo(cx + Math.cos(angle) * r2, cy + Math.sin(angle) * r2 * 0.68);
+      ctx.moveTo(x, checkpoint.y);
+      ctx.lineTo(x, checkpoint.y - 180);
       ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  drawObjects(state) {
-    const visible = state.objects
-      .filter((object) => {
-        const z = object.distance - state.distance;
-        return z > 5 && z < VIEW_DISTANCE;
-      })
-      .sort((a, b) => b.distance - a.distance);
-    for (const object of visible) {
-      const z = object.distance - state.distance;
-      if (object.kind === 'gate') this.drawGate(object, z, state);
-      else if (object.kind === 'charge') this.drawCharge(object, z, state);
-      else this.drawObstacle(object, z, state);
-    }
-  }
-
-  drawGate(object, z, state) {
-    const ctx = this.context;
-    const center = this.centerAt(z, state);
-    const radius = this.radiusAt(z) * 0.79;
-    const perspective = CAMERA_DEPTH / (z + CAMERA_DEPTH);
-    const gap = object.opening;
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    ctx.shadowColor = '#4eb1ff';
-    ctx.shadowBlur = 8 + perspective * 20;
-    ctx.strokeStyle = 'rgba(88,181,255,' + (0.45 + perspective * 0.45) + ')';
-    ctx.lineWidth = 2 + perspective * 11;
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, radius, radius * 0.68, 0, object.angle + gap * 0.5, object.angle + TAU - gap * 0.5);
-    ctx.stroke();
-    const left = this.project(z, object.angle - gap * 0.5, 0.79, state);
-    const right = this.project(z, object.angle + gap * 0.5, 0.79, state);
-    [left, right].forEach((point) => {
-      ctx.fillStyle = '#ff8c2d';
-      ctx.shadowColor = '#ff6a00';
+      ctx.fillStyle = checkpoint.active ? '#1b9f6b' : '#0065ad';
       ctx.beginPath();
-      ctx.arc(point.x, point.y, 2 + perspective * 8, 0, TAU);
+      ctx.moveTo(x, checkpoint.y - 180);
+      ctx.lineTo(x + 125, checkpoint.y - 153 + Math.sin(time * .004) * 4);
+      ctx.lineTo(x, checkpoint.y - 116);
+      ctx.closePath();
       ctx.fill();
-    });
-    ctx.restore();
-  }
-
-  drawObstacle(object, z, state) {
-    const ctx = this.context;
-    const point = this.project(z, object.angle, 0.73, state);
-    const perspective = CAMERA_DEPTH / (z + CAMERA_DEPTH);
-    const size = 4 + perspective * 38;
-    ctx.save();
-    ctx.translate(point.x, point.y);
-    ctx.rotate(object.angle + state.distance * 0.002 * (object.variant + 1));
-    ctx.shadowColor = '#ff542f';
-    ctx.shadowBlur = 8 + perspective * 16;
-    ctx.fillStyle = object.variant === 0 ? '#8d4538' : object.variant === 1 ? '#a56445' : '#6d7580';
-    ctx.beginPath();
-    for (let i = 0; i < 7; i += 1) {
-      const angle = i / 7 * TAU;
-      const radius = size * (i % 2 ? 0.62 : 1);
-      ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      if (this.logo) ctx.drawImage(this.logo, x + 13, checkpoint.y - 166, 91, 23);
+      ctx.fillStyle = '#d8e8f2';
+      ctx.font = '700 12px "Barlow Condensed",sans-serif';
+      ctx.fillText(checkpoint.active ? 'CHECKPOINT AKTIV' : 'SERVICEPUNKT', x + 12, checkpoint.y - 196);
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
   }
 
-  drawCharge(object, z, state) {
-    const ctx = this.context;
-    const point = this.project(z, object.angle, 0.72, state);
-    const perspective = CAMERA_DEPTH / (z + CAMERA_DEPTH);
-    const size = 3 + perspective * 24;
+  drawTraps(state, time) {
+    for (const trap of state.level.traps) {
+      if (trap.type === 'spikes') this.drawSpikes(trap, state);
+      else if (trap.type === 'fallingPipe') this.drawFallingPipe(trap, state);
+      else this.drawPressure(trap, state, time);
+    }
+    const ctx = this.ctx;
+    const fakeX = this.worldX(6070, state);
+    if (fakeX > -200 && fakeX < VIEW_WIDTH + 200) {
+      ctx.fillStyle = '#f5f7f8';
+      ctx.fillRect(fakeX, 505, 9, 165);
+      ctx.fillStyle = '#ff7a1a';
+      ctx.fillRect(fakeX, 505, 126, 55);
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 18px "Barlow Condensed",sans-serif';
+      ctx.fillText('ZIEL?', fakeX + 22, 540);
+    }
+  }
+
+  drawSpikes(trap, state) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -200 || x > VIEW_WIDTH + 200 || trap.progress <= 0) return;
+    const height = trap.height * trap.progress;
+    const count = Math.ceil(trap.width / 30);
+    ctx.fillStyle = '#cfdce3';
+    ctx.strokeStyle = '#ff7a1a';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < count; i += 1) {
+      const spikeX = x + i * trap.width / count;
+      ctx.beginPath();
+      ctx.moveTo(spikeX, trap.y);
+      ctx.lineTo(spikeX + trap.width / count / 2, trap.y - height);
+      ctx.lineTo(spikeX + trap.width / count, trap.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  drawFallingPipe(trap, state) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -180 || x > VIEW_WIDTH + 180) return;
+    const steel = ctx.createLinearGradient(x, 0, x + trap.width, 0);
+    steel.addColorStop(0, '#334c60');
+    steel.addColorStop(.23, '#e1ebef');
+    steel.addColorStop(.52, '#71899a');
+    steel.addColorStop(.78, '#f5f8f9');
+    steel.addColorStop(1, '#294155');
+    ctx.fillStyle = steel;
+    ctx.fillRect(x, trap.y, trap.width, trap.height);
+    ctx.fillStyle = '#344f64';
+    for (let y = trap.y + 35; y < trap.y + trap.height; y += 55) ctx.fillRect(x - 5, y, trap.width + 10, 8);
     ctx.save();
-    ctx.translate(point.x, point.y);
-    ctx.rotate(Math.PI / 4 + state.distance * 0.006);
-    ctx.globalCompositeOperation = 'screen';
-    ctx.shadowColor = '#ff7a1a';
-    ctx.shadowBlur = 12 + perspective * 25;
-    const gradient = ctx.createLinearGradient(-size, -size, size, size);
-    gradient.addColorStop(0, '#fff4d0');
-    gradient.addColorStop(0.45, '#ff9a32');
-    gradient.addColorStop(1, '#ff5a00');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(-size, -size, size * 2, size * 2);
+    ctx.translate(x + trap.width / 2, trap.y + trap.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = '#0b5f9e';
+    ctx.font = '800 18px "Barlow Condensed",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(trap.section === 2 ? 'FSA-X // JEREMIAS' : 'DW-FU // JEREMIAS', 0, 6);
     ctx.restore();
   }
 
-  drawRider(state, time) {
-    const ctx = this.context;
-    const base = Math.min(this.width, this.height) * 0.315;
-    const x = this.width * 0.5 + Math.cos(state.angle) * base;
-    const y = this.height * 0.5 + Math.sin(state.angle) * base * 0.68;
-    const rotation = state.angle + Math.PI / 2;
-    const pulse = 1 + Math.sin(time * 0.012) * 0.08;
+  drawPressure(trap, state, time) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -260 || x > VIEW_WIDTH + 260) return;
+    ctx.fillStyle = '#5c7487';
+    ctx.fillRect(x, trap.y - 95, 56, 95);
+    ctx.fillStyle = '#d9e5ea';
+    ctx.beginPath();
+    ctx.ellipse(x + 28, trap.y - 95, 34, 17, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#17364f';
+    ctx.font = '700 11px "Barlow Condensed",sans-serif';
+    ctx.fillText('PRÜFÖFFNUNG', x - 8, trap.y + 25);
+    if (trap.triggered && trap.timer > .28 && trap.timer < 1.1) {
+      const length = 190 + Math.sin(time * .03) * 15;
+      const blast = ctx.createLinearGradient(x, 0, x - length, 0);
+      blast.addColorStop(0, 'rgba(255,155,61,.9)');
+      blast.addColorStop(1, 'rgba(79,186,255,0)');
+      ctx.fillStyle = blast;
+      ctx.beginPath();
+      ctx.moveTo(x, trap.y - 112);
+      ctx.lineTo(x - length, trap.y - 170);
+      ctx.lineTo(x - length, trap.y - 45);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  drawFinish(state, time) {
+    const ctx = this.ctx;
+    const x = this.worldX(state.level.finish.x, state);
+    if (x < -300 || x > VIEW_WIDTH + 400) return;
+    const y = state.level.finish.y;
+    const width = 135;
+    const tower = ctx.createLinearGradient(x, 0, x + width, 0);
+    tower.addColorStop(0, '#243f56');
+    tower.addColorStop(.2, '#dce7eb');
+    tower.addColorStop(.5, '#627d91');
+    tower.addColorStop(.8, '#f3f6f7');
+    tower.addColorStop(1, '#274258');
+    ctx.fillStyle = tower;
+    ctx.fillRect(x, y - 470, width, 470);
+    ctx.fillStyle = '#314b60';
+    for (let py = y - 390; py < y; py += 95) ctx.fillRect(x - 18, py, width + 36, 12);
+    ctx.strokeStyle = '#96aabd';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(x - 26, y - 285, width + 52, 28);
+    ctx.fillStyle = '#ff7a1a';
+    ctx.globalAlpha = .65 + Math.sin(time * .006) * .25;
+    ctx.fillRect(x + width / 2 - 5, y - 520, 10, 55);
+    ctx.globalAlpha = 1;
+    if (this.logo) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x - 60, y - 215, 255, 78);
+      ctx.drawImage(this.logo, x - 38, y - 197, 208, 52);
+    }
+    ctx.fillStyle = '#fff';
+    ctx.font = '800 22px "Barlow Condensed",sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ECHTES ZIEL // FSA-X', x + width / 2, y - 545);
+  }
+
+  drawPlayer(state, time) {
+    const ctx = this.ctx;
+    const player = state.player;
+    const x = this.worldX(player.x, state);
+    const phase = time * .015;
+    const leg = player.onGround && Math.abs(player.vx) > 20 ? Math.sin(phase) * 17 : 5;
+    const arm = player.onGround && Math.abs(player.vx) > 20 ? -leg * .7 : -9;
     ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(rotation);
-    ctx.globalCompositeOperation = 'screen';
-    const trail = ctx.createLinearGradient(0, 8, 0, 68 + state.speed * 0.18);
-    trail.addColorStop(0, 'rgba(255,180,82,.85)');
-    trail.addColorStop(1, 'rgba(255,86,0,0)');
-    ctx.fillStyle = trail;
+    ctx.translate(x + PLAYER_WIDTH / 2, player.y + PLAYER_HEIGHT / 2);
+    if (player.invulnerable > 0 && Math.floor(time / 80) % 2 === 0) ctx.globalAlpha = .28;
+    ctx.scale(player.facing, 1);
+    ctx.rotate(player.onGround ? 0 : Math.max(-.18, Math.min(.22, player.vy / 1800)));
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#08243d';
+    ctx.lineWidth = 13;
     ctx.beginPath();
-    ctx.moveTo(-6, 7);
-    ctx.quadraticCurveTo(0, 48 + state.speed * 0.22, 7, 7);
-    ctx.closePath();
-    ctx.fill();
-    ctx.shadowColor = state.hitTimer > 0 ? '#ff3154' : '#ff8a28';
-    ctx.shadowBlur = 28;
-    ctx.fillStyle = state.hitTimer > 0 ? '#ff617b' : '#fff3d5';
+    ctx.moveTo(-8, 24); ctx.lineTo(-13 + leg, 49);
+    ctx.moveTo(8, 24); ctx.lineTo(13 - leg, 49);
+    ctx.stroke();
+    ctx.strokeStyle = '#0871bd';
+    ctx.lineWidth = 11;
     ctx.beginPath();
-    ctx.moveTo(0, -15 * pulse);
-    ctx.lineTo(11 * pulse, 10 * pulse);
-    ctx.lineTo(0, 5 * pulse);
-    ctx.lineTo(-11 * pulse, 10 * pulse);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = '#ff7417';
-    ctx.beginPath();
-    ctx.arc(0, 1, 4.5 * pulse, 0, TAU);
-    ctx.fill();
+    ctx.moveTo(-18, -8); ctx.lineTo(-25 + arm, 16);
+    ctx.moveTo(18, -8); ctx.lineTo(25 - arm, 16);
+    ctx.stroke();
+    ctx.fillStyle = '#075d9e';
+    roundRect(ctx, -23, -31, 46, 63, 14); ctx.fill();
+    ctx.fillStyle = '#ff7a1a'; ctx.fillRect(-23, -7, 46, 16);
+    ctx.fillStyle = '#dceaf1'; ctx.beginPath(); ctx.arc(0, -42, 20, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ff892b'; ctx.fillRect(-24, -54, 48, 12);
+    ctx.fillStyle = '#17364e'; ctx.fillRect(4, -45, 17, 7);
+    ctx.fillStyle = '#fff'; ctx.font = '800 13px "Barlow Condensed",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('J', 0, 7);
     ctx.restore();
   }
 
-  emit(kind, angle) {
+  emit(x, y, color, count = 18) {
     if (this.settings.reducedMotion) return;
-    const color = kind === 'hit' ? '#ff496b' : kind === 'charge' ? '#ff8b22' : '#65c8ff';
-    for (let index = 0; index < (kind === 'hit' ? 28 : 16); index += 1) {
-      this.particles.push({
-        angle,
-        radius: Math.min(this.width, this.height) * 0.31,
-        life: 0.55 + Math.random() * 0.45,
-        speed: 45 + Math.random() * 130,
-        drift: (Math.random() - 0.5) * 2.2,
-        size: 1.5 + Math.random() * 4,
-        color
-      });
-    }
+    for (let i = 0; i < count; i += 1) this.particles.push({
+      x, y, color,
+      vx: (Math.random() - .5) * 270,
+      vy: -90 - Math.random() * 280,
+      life: .55 + Math.random() * .5,
+      size: 3 + Math.random() * 6
+    });
   }
 
   drawParticles(state) {
-    const ctx = this.context;
-    const dt = Math.min(0.033, state.renderDelta || 0.016);
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    this.particles = this.particles.filter((particle) => {
-      particle.life -= dt;
-      if (particle.life <= 0) return false;
-      particle.radius += particle.speed * dt;
-      particle.angle += particle.drift * dt;
-      const x = this.width * 0.5 + Math.cos(particle.angle) * particle.radius;
-      const y = this.height * 0.5 + Math.sin(particle.angle) * particle.radius * 0.68;
-      ctx.globalAlpha = Math.min(1, particle.life * 2);
-      ctx.fillStyle = particle.color;
-      ctx.shadowColor = particle.color;
-      ctx.shadowBlur = 9;
-      ctx.beginPath();
-      ctx.arc(x, y, particle.size, 0, TAU);
-      ctx.fill();
+    const ctx = this.ctx;
+    const dt = Math.min(.033, state.renderDelta || .016);
+    this.particles = this.particles.filter((p) => {
+      p.life -= dt;
+      if (p.life <= 0) return false;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 520 * dt;
+      ctx.globalAlpha = Math.min(1, p.life * 2);
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(this.worldX(p.x, state), p.y, p.size, 0, Math.PI * 2); ctx.fill();
       return true;
     });
-    ctx.restore();
     ctx.globalAlpha = 1;
+  }
+
+  drawVignette() {
+    const ctx = this.ctx;
+    const gradient = ctx.createRadialGradient(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 300, VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 900);
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,3,10,.48)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
   }
 }
 
-function hexToRgba(hex, alpha) {
-  const value = parseInt(hex.slice(1), 16);
-  return 'rgba(' + (value >> 16) + ',' + ((value >> 8) & 255) + ',' + (value & 255) + ',' + alpha + ')';
+function roundRect(ctx, x, y, width, height, radius) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, height, radius);
 }

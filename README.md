@@ -1,29 +1,33 @@
-# JEREMIAS: DRAUGHT RIDER
+# UNFAIR JEREMIAS // NACHTSCHICHT
 
-Ein schneller 2.5D-Flow-Runner durch drei von Jeremias Abgastechnik inspirierte Systemwelten. Die Kampagne führt von einem doppelwandigen Edelstahlschornstein über eine Designstrecke bis in einen großen Industrieschornstein und geht anschließend in den Endless Flow über.
+Ein handgebautes Rage-Platformer-Spiel im Stil klassischer „Unfair“-Jump-’n’-Runs – vollständig als Jeremias-Abgastechnik-Welt inszeniert. Ziel ist der große FSA-X-Industrieschornstein am Ende der Nachtschicht. Unsichtbare Klemmband-Fallen, fallende DW-Elemente, Druckstöße aus Prüföffnungen und einstürzende Wartungsdächer machen den Weg bewusst gemein, aber lernbar.
 
 **Live:** https://kaisrjakob.github.io/JER-GAME/
 
-## Steuerung
+## Ziel und Steuerung
 
-- Maus oder A/D beziehungsweise Pfeiltasten: um die Innenwand steuern
-- W, Pfeil hoch oder Leertaste: Boost
-- S oder Pfeil runter: bremsen
-- Escape oder P: Pause
+- **A / D** oder **Pfeiltasten**: laufen
+- **W**, **Pfeil hoch** oder **Leertaste**: springen
+- **R**: sofort zum letzten Jeremias-Servicepunkt zurückkehren
+- **Escape / P**: Pause
 
-Auf Touch-Geräten folgt der Rider dem Finger; der rechte Bildschirmrand aktiviert den Boost.
+Auf Touch-Geräten stehen große Links-, Rechts- und Sprungtasten bereit. Das Ziel, die Steuerung und die unfairen Spielregeln werden vor jedem Lauf direkt eingeblendet.
 
-## Spielsystem
+## Jeremias-Spielwelt
 
-- Strömungstore erhöhen Score und Multiplikator.
-- Orange Energieimpulse füllen den Boost.
-- Knappe Ausweichmanöver liefern Bonuspunkte.
-- Drei Kollisionen beenden den Lauf.
-- Highscore, Tutorialstatus und Audioeinstellung werden ausschließlich lokal im Browser gespeichert.
+- Drei Abschnitte: **DW-FU**, **DW-VISION** und **FSA-X**
+- Spielfigur als Jeremias-Servicetechniker in Blau und Orange
+- Plattformen als Edelstahl-Wartungsdächer mit Klemmbändern und Systemkennzeichnung
+- Sammelobjekte als orange Jeremias-Klemmbänder
+- Checkpoints als Jeremias-Servicepunkte mit Firmenlogo
+- Fallen aus Kaminhauben, DW-Elementen und Prüföffnungen
+- Zielbauwerk als großer, gebrandeter FSA-X-Industrieschornstein
+
+Es werden keine Nintendo- oder Mario-Grafiken, Figuren, Musikstücke oder Markenzeichen verwendet.
 
 ## Entwicklung
 
-Das Spiel benötigt keine Laufzeit-Abhängigkeiten und läuft direkt als statische Website:
+Das Spiel ist eine statische Canvas-Webanwendung ohne Laufzeit-Abhängigkeiten:
 
 ```powershell
 python -m http.server 4173
@@ -38,11 +42,11 @@ npm run check
 
 ## Technik und Datenschutz
 
-Canvas 2D rendert den pseudo-räumlichen Tunnel mit festem Simulationsschritt. Musik und Effekte entstehen zur Laufzeit über Web Audio. Es gibt kein Backend, keine Cookies, kein Tracking, keine Online-Rangliste und keine Übertragung von Spieldaten.
+Canvas 2D rendert das Level mit festem Simulationsschritt. Musik und Effekte entstehen lokal über Web Audio. Highscore und Audioeinstellung bleiben im Browser. Es gibt kein Backend, keine Cookies, kein Tracking und keine Übertragung von Spieldaten.
 
 ## Bildquellen
 
 - Offizielles Logo: Jeremias Abgastechnik GmbH, https://jeremias.de/
 - Produktreferenz Doppelwandiger Edelstahlschornstein: https://jeremias.de/edelstahlschornstein
 - Systemreferenz Industrieschornstein: https://jeremias.de/industrieschornstein
-- Die drei text- und logofreien Spielhintergründe wurden für dieses Projekt mit OpenAIs eingebauter Bildgenerierung erstellt und lokal optimiert.
+- Die drei text- und logofreien Hintergrundwelten wurden für dieses Projekt mit OpenAIs eingebauter Bildgenerierung erstellt und lokal optimiert.

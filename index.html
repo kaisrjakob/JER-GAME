@@ -2,37 +2,53 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#06142b"><meta name="description" content="JEREMIAS: Draught Rider – der rasante Flow-Run durch Edelstahl- und Industrieschornsteine.">
-  <title>JEREMIAS: DRAUGHT RIDER</title><link rel="icon" href="assets/reference-industry.png"><link rel="preload" href="assets/world-dw.jpg" as="image"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="settings.css">
+  <meta name="theme-color" content="#05142a"><meta name="description" content="UNFAIR JEREMIAS – die gemeinste Nachtschicht der Abgastechnik.">
+  <title>UNFAIR JEREMIAS // NACHTSCHICHT</title>
+  <link rel="icon" href="assets/reference-industry.png"><link rel="preload" href="assets/world-industry.jpg" as="image"><link rel="stylesheet" href="style.css">
 </head>
 <body><main id="app">
-  <canvas id="game-canvas" aria-label="Draught Rider Spielfläche"></canvas>
-  <section id="loading-screen" class="screen screen--active" aria-live="polite"><div class="loading-mark"></div><p>STRÖMUNGSSYSTEM WIRD KALIBRIERT</p><div class="loading-track"><i id="loading-progress"></i></div></section>
-  <section id="menu-screen" class="screen hero" aria-labelledby="game-title">
-    <div class="hero__wash"></div><header class="brand-lockup"><img src="assets/jeremias-logo.png" alt="Jeremias Abgastechnik"><span>FLOW LAB // 01</span></header>
-    <div class="hero__content"><p class="eyebrow">DIE STRÖMUNG. DEINE LINIE.</p><h1 id="game-title"><span>JEREMIAS</span>DRAUGHT<br>RIDER</h1>
-      <p class="hero__copy">Rase durch präzise Abgassysteme, halte den optimalen Zug und bringe deinen Flow bis an die Spitze.</p>
-      <div class="hero__actions"><button id="start-button" class="button button--primary">FLOW STARTEN <b>→</b></button><button id="how-button" class="button button--ghost">STEUERUNG</button><button id="settings-button" class="button button--ghost">SETTINGS</button></div>
-      <div class="feature-strip"><span><b>03</b> SYSTEMWELTEN</span><span><b>∞</b> ENDLESS FLOW</span><span><b id="menu-highscore">000000</b> BESTWERT</span></div>
-    </div><div class="hero__system"><span>DW-FU</span><i></i><span>DW-VISION</span><i></i><span>FSA-X</span></div>
+  <canvas id="game-canvas" aria-label="Unfair Jeremias Spielfläche"></canvas>
+  <section id="loading-screen" class="screen screen--active"><div class="loading-mark"></div><p>NACHTSCHICHT WIRD VORBEREITET</p><div class="loading-track"><i id="loading-progress"></i></div></section>
+
+  <section id="menu-screen" class="screen hero">
+    <header class="brand"><img src="assets/jeremias-logo.png" alt="Jeremias Abgastechnik"><span>WERK WASSERTRÜDINGEN // 23:47</span></header>
+    <div class="hero__content">
+      <p class="eyebrow">DIE GEMEINSTE SCHICHT DES JAHRES</p>
+      <h1><em>UNFAIR</em><span>JEREMIAS</span>NACHTSCHICHT</h1>
+      <p class="hero__copy">Erreiche den großen FSA-X-Industrieschornstein. Vertraue keinem Klemmband, keiner Montagebühne und erst recht keinem Zielschild.</p>
+      <div class="mission-rule"><div><kbd>A</kbd><kbd>D</kbd><b>LAUFEN</b></div><div><kbd>SPACE</kbd><b>SPRINGEN</b></div><div><kbd>R</kbd><b>CHECKPOINT</b></div></div>
+      <div class="hero__actions"><button id="start-button" class="button button--primary">NACHTSCHICHT STARTEN <b>→</b></button><button id="how-button" class="button button--ghost">WAS MUSS ICH TUN?</button></div>
+      <div class="best"><span>BESTER EINSATZ</span><strong id="menu-highscore">000000</strong></div>
+    </div>
+    <div class="system-route"><span>DW-FU</span><i></i><span>DW-VISION</span><i></i><span>FSA-X</span></div>
   </section>
-  <section id="how-screen" class="screen panel-screen" aria-labelledby="how-title"><div class="glass-panel glass-panel--wide"><button class="icon-button close-button" data-close="how-screen" aria-label="Schließen">×</button><p class="eyebrow">FLOW PROTOCOL</p><h2 id="how-title">Finde die perfekte Linie.</h2>
-    <div class="control-grid"><article><div class="key-row"><kbd>A</kbd><kbd>D</kbd></div><h3>Steuern</h3><p>Bewege dich um die Innenwand. Alternativ folgt der Rider deiner Maus.</p></article><article><div class="key-row"><kbd>W</kbd><kbd>↥</kbd></div><h3>Boosten</h3><p>Halte W, Pfeil hoch oder Leertaste. Orange Impulse laden Energie nach.</p></article><article><div class="key-row"><kbd>S</kbd></div><h3>Bremsen</h3><p>Nutze kurze Bremsimpulse, um schwierige Torfolgen sauber zu lesen.</p></article></div>
-    <div class="tip"><b>PRO-TIPP</b> Knappe Ausweichmanöver erhöhen den Multiplikator. Drei Kollisionen beenden den Lauf.</div><button class="button button--primary" data-close="how-screen">VERSTANDEN</button>
+
+  <section id="how-screen" class="screen panel-screen"><div class="panel panel--wide"><button class="close" data-close="how-screen" aria-label="Schließen">×</button><p class="eyebrow">EINSATZBESPRECHUNG</p><h2>Ein Ziel. Viele Fallen.</h2>
+    <div class="briefing">
+      <article><span class="briefing__number">01</span><h3>FSA-X erreichen</h3><p>Laufe nach rechts bis zum echten Jeremias-Industrieschornstein.</p></article>
+      <article><span class="briefing__number">02</span><h3>Nichts glauben</h3><p>Kaminhauben, DW-Elemente, Prüföffnungen und Plattformen können Fallen sein.</p></article>
+      <article><span class="briefing__number">03</span><h3>Stellen lernen</h3><p>Nach jedem Tod startest du am letzten blauen Jeremias-Servicepunkt.</p></article>
+    </div>
+    <div class="controls"><span><kbd>A</kbd><kbd>←</kbd> LINKS</span><span><kbd>D</kbd><kbd>→</kbd> RECHTS</span><span><kbd>SPACE</kbd> SPRINGEN</span><span><kbd>R</kbd> NEU</span></div>
+    <button class="button button--primary" data-close="how-screen">VERSTANDEN</button>
   </div></section>
-  <section id="settings-screen" class="screen panel-screen" aria-labelledby="settings-title"><div class="glass-panel"><button class="icon-button close-button" data-close="settings-screen" aria-label="Schließen">×</button><p class="eyebrow">SYSTEM SETUP</p><h2 id="settings-title">Einstellungen</h2>
-    <label class="setting-row"><span><b>MUSIK</b><small>Dynamischer Industrial Score</small></span><input id="music-range" type="range" min="0" max="100" step="1"></label>
-    <label class="setting-row"><span><b>EFFEKTE</b><small>Feedback, Tore und Kollisionen</small></span><input id="sfx-range" type="range" min="0" max="100" step="1"></label>
-    <label class="setting-row"><span><b>REDUZIERTE BEWEGUNG</b><small>Weniger Partikel und Kameraeffekte</small></span><input id="motion-toggle" type="checkbox"></label>
-    <label class="setting-row"><span><b>STEUERUNG</b><small>Eingabemethode priorisieren</small></span><select id="control-select"><option value="hybrid">Maus + Tastatur</option><option value="keyboard">Nur Tastatur</option><option value="pointer">Nur Maus / Touch</option></select></label>
-    <button class="button button--primary" data-close="settings-screen">ÜBERNEHMEN</button>
-  </div></section>
-  <section id="world-card" class="world-card" aria-live="polite"><div class="world-card__index" id="world-index">01</div><div><p id="world-kicker">ELEMENTSCHORNSTEIN</p><h2 id="world-title">DW-FU</h2><p id="world-copy">Präzision beginnt im Detail.</p></div><div class="world-card__line"></div></section>
-  <section id="hud" class="hud" aria-label="Spielstatus"><div class="hud__brand"><img src="assets/jeremias-logo.png" alt=""><span id="hud-world">DW-FU // FLOW 01</span></div><div class="hud__score"><small>SCORE</small><strong id="score">000000</strong><span id="multiplier">×1.0</span></div>
-    <div class="hud__right"><div class="meter"><div><small>BOOST</small><span id="speed-label">080 KM/H</span></div><i><b id="boost-fill"></b></i></div><div class="stability"><small>STABILITÄT</small><div id="stability-bars"><i></i><i></i><i></i></div></div><button id="audio-button" class="hud-button" aria-label="Audio umschalten">♫</button><button id="pause-button" class="hud-button" aria-label="Pause">Ⅱ</button></div>
-    <div id="combo-callout" class="combo-callout">PERFECT FLOW</div><div class="progress-rail"><i id="campaign-progress"></i><span>DW-FU</span><span>DW-VISION</span><span>FSA-X</span><span>∞</span></div>
+
+  <section id="hud" class="hud">
+    <div class="hud__brand"><img src="assets/jeremias-logo.png" alt=""><span id="hud-section">DW-FU // ABSCHNITT 01</span></div>
+    <div class="objective"><small>DEIN ZIEL</small><strong>ERREICHE DEN FSA-X-TURM →</strong></div>
+    <div class="hud__stats"><div><small>ZEIT</small><b id="timer">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="death-count">00</b></div><div><small>KLEMMBÄNDER</small><b id="band-count">0 / 12</b></div><button id="audio-button" class="hud-button" aria-label="Audio">♫</button><button id="pause-button" class="hud-button" aria-label="Pause">Ⅱ</button></div>
+    <div class="progress"><i id="campaign-progress"></i><span>START</span><span>DW-FU</span><span>DW-VISION</span><span>FSA-X</span></div>
   </section>
-  <section id="pause-screen" class="screen panel-screen"><div class="glass-panel"><p class="eyebrow">FLOW ANGEHALTEN</p><h2>Pause</h2><button id="resume-button" class="button button--primary">WEITER</button><button id="restart-pause-button" class="button button--ghost">NEU STARTEN</button><button id="settings-pause-button" class="button button--ghost">EINSTELLUNGEN</button><button id="menu-pause-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
-  <section id="gameover-screen" class="screen result-screen"><div class="result-card"><p class="eyebrow" id="result-kicker">FLOW BEENDET</p><h2 id="result-title">Starke Linie.</h2><div class="result-score"><span>DEIN SCORE</span><strong id="final-score">000000</strong><em id="new-best">NEUER BESTWERT</em></div><div class="result-stats"><div><small>DISTANZ</small><b id="final-distance">0 M</b></div><div><small>PERFEKTE TORE</small><b id="final-gates">0</b></div><div><small>MAX. KOMBO</small><b id="final-combo">×1.0</b></div></div><button id="restart-button" class="button button--primary">NOCH EIN FLOW <b>→</b></button><button id="menu-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
-  <div id="flash" class="flash"></div><div id="toast" class="toast" aria-live="polite"></div><footer class="site-footer"><span>© JEREMIAS ABGASTECHNIK GMBH</span><a href="https://jeremias.de/impressum" target="_blank" rel="noopener">IMPRESSUM</a><a href="https://jeremias.de/datenschutz" target="_blank" rel="noopener">DATENSCHUTZ</a></footer>
+
+  <section id="ready-overlay" class="ready-overlay"><div class="ready-card"><p>DEIN AUFTRAG</p><h2>ERREICHE DEN<br><b>FSA-X-TURM</b></h2><div><kbd>A</kbd><kbd>D</kbd><span>LAUFEN</span><kbd>SPACE</kbd><span>SPRINGEN</span></div><strong>DRÜCKE LEERTASTE ZUM START</strong><small>WARNUNG: Das Level spielt unfair. Die Steuerung nicht.</small></div></section>
+  <section id="death-overlay" class="death-overlay"><span>×</span><strong id="death-message">JETZT KENNST DU DIE STELLE.</strong></section>
+  <section id="section-card" class="section-card"><p id="section-kicker">ABSCHNITT 01</p><h2 id="section-title">DW-FU</h2><span id="section-copy">Klemmbänder und die erste Gemeinheit.</span></section>
+  <div id="callout" class="callout">SERVICEPUNKT AKTIV</div>
+
+  <section id="pause-screen" class="screen panel-screen"><div class="panel"><p class="eyebrow">EINSATZ PAUSIERT</p><h2>Kurze Pause?</h2><button id="resume-button" class="button button--primary">WEITER</button><button id="restart-pause-button" class="button button--ghost">AM CHECKPOINT NEU</button><button id="menu-pause-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
+  <section id="win-screen" class="screen win-screen"><div class="panel result"><p class="eyebrow">FSA-X ERREICHT</p><h2>Nachtschicht<br>gemeistert.</h2><div class="final-score"><small>EINSATZWERTUNG</small><strong id="final-score">000000</strong><em id="new-best">NEUER BESTWERT</em></div><div class="result-grid"><div><small>ZEIT</small><b id="final-time">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="final-deaths">0</b></div><div><small>KLEMMBÄNDER</small><b id="final-bands">0 / 12</b></div></div><button id="restart-button" class="button button--primary">NOCH EINE SCHICHT <b>→</b></button><button id="menu-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
+
+  <div class="touch-controls"><button id="touch-left">←</button><button id="touch-right">→</button><button id="touch-jump">SPRUNG</button></div>
+  <div id="flash" class="flash"></div>
+  <footer class="site-footer"><span>© JEREMIAS ABGASTECHNIK GMBH</span><a href="https://jeremias.de/impressum" target="_blank" rel="noopener">IMPRESSUM</a><a href="https://jeremias.de/datenschutz" target="_blank" rel="noopener">DATENSCHUTZ</a></footer>
 </main><script type="module" src="game.js"></script></body></html>

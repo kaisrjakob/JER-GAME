@@ -1,52 +1,61 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAMPAIGN_END, WORLDS, difficultyForDistance, formatScore, worldIndexForDistance } from '../src/config.js';
-import { TrackGenerator, angularDistance, classifyPass, mulberry32, normalizeAngle } from '../src/track.js';
+import { LEVEL_END, SECTIONS, calculateScore, formatScore, sectionIndexForX } from '../src/config.js';
+import { activeTrapBox, createLevel, overlaps } from '../src/track.js';
 
-test('seeded random and track generation are deterministic', () => {
-  const first = new TrackGenerator(42).fill(0, 4000);
-  const second = new TrackGenerator(42).fill(0, 4000);
-  assert.deepEqual(first, second);
-  assert.ok(first.length > 8);
-  assert.ok(first.every((object, index) => index === 0 || object.distance > first[index - 1].distance));
+test('the hand-authored campaign covers all three Jeremias system sections', () => {
+  const level = createLevel();
+  assert.equal(SECTIONS.length, 3);
+  assert.deepEqual(SECTIONS.map((section) => section.id), ['dw-fu', 'dw-vision', 'fsa-x']);
+  assert.deepEqual(new Set(level.platforms.map((platform) => platform.section)), new Set([0, 1, 2]));
+  assert.ok(level.finish.x < LEVEL_END);
+  assert.equal(level.checkpoints.length, 3);
+  assert.equal(level.bands.length, 12);
 });
 
-test('track keeps early campaign readable and includes every pickup type', () => {
-  const track = new TrackGenerator(1974).fill(0, 9000);
-  const early = track.filter((object) => object.distance < 1250);
-  assert.ok(early.filter((object) => object.kind === 'gate').length >= 2);
-  assert.deepEqual(new Set(track.map((object) => object.kind)), new Set(['gate', 'obstacle', 'charge']));
-  assert.ok(track.every((object) => object.angle >= -Math.PI && object.angle <= Math.PI));
+test('fresh levels are independent and every trap starts hidden', () => {
+  const first = createLevel();
+  const second = createLevel();
+  first.traps[0].triggered = true;
+  first.bands[0].collected = true;
+  assert.equal(second.traps[0].triggered, false);
+  assert.equal(second.bands[0].collected, false);
+  assert.ok(second.traps.every((trap) => !trap.triggered));
 });
 
-test('angular calculations wrap across the seam', () => {
-  assert.ok(angularDistance(Math.PI - 0.1, -Math.PI + 0.1) < 0.21);
-  assert.ok(normalizeAngle(Math.PI * 3) <= Math.PI);
-  assert.ok(normalizeAngle(-Math.PI * 3) >= -Math.PI);
+test('section mapping changes exactly at the authored boundaries', () => {
+  assert.equal(sectionIndexForX(0), 0);
+  assert.equal(sectionIndexForX(2399), 0);
+  assert.equal(sectionIndexForX(2400), 1);
+  assert.equal(sectionIndexForX(4799), 1);
+  assert.equal(sectionIndexForX(4800), 2);
 });
 
-test('pass classification handles gates, hazards and charges', () => {
-  assert.equal(classifyPass({ kind: 'gate', angle: 0, opening: 1 }, 0.4), 'perfect');
-  assert.equal(classifyPass({ kind: 'gate', angle: 0, opening: 1 }, 0.8), 'hit');
-  assert.equal(classifyPass({ kind: 'obstacle', angle: 0, width: 0.3 }, 0.2), 'hit');
-  assert.equal(classifyPass({ kind: 'obstacle', angle: 0, width: 0.3 }, 0.5), 'near');
-  assert.equal(classifyPass({ kind: 'charge', angle: 0, width: 0.3 }, 0.2), 'charge');
+test('collision helper excludes touching edges and finds real overlap', () => {
+  const box = { x: 0, y: 0, width: 50, height: 50 };
+  assert.equal(overlaps(box, { x: 49, y: 20, width: 10, height: 10 }), true);
+  assert.equal(overlaps(box, { x: 50, y: 20, width: 10, height: 10 }), false);
+  assert.equal(overlaps(box, { x: 10, y: 60, width: 10, height: 10 }), false);
 });
 
-test('campaign maps exactly to three worlds and then loops', () => {
-  assert.equal(WORLDS.length, 3);
-  assert.equal(worldIndexForDistance(0), 0);
-  assert.equal(worldIndexForDistance(2800), 1);
-  assert.equal(worldIndexForDistance(5600), 2);
-  assert.equal(worldIndexForDistance(CAMPAIGN_END), 0);
-  assert.ok(difficultyForDistance(CAMPAIGN_END + 9000) > difficultyForDistance(0));
+test('trap hitboxes activate only when the unfair surprise is live', () => {
+  const level = createLevel();
+  const spikes = level.traps.find((trap) => trap.type === 'spikes');
+  const pipe = level.traps.find((trap) => trap.type === 'fallingPipe');
+  assert.equal(activeTrapBox(spikes), null);
+  spikes.progress = 0.56;
+  assert.ok(activeTrapBox(spikes).height > 0);
+  assert.equal(activeTrapBox(pipe), null);
+  pipe.triggered = true;
+  assert.deepEqual(activeTrapBox(pipe), {
+    x: pipe.x, y: pipe.y, width: pipe.width, height: pipe.height
+  });
+});
+
+test('score rewards fast, clean runs and collected Jeremias clamp bands', () => {
+  assert.equal(calculateScore(100, 0, 0), 82000);
+  assert.equal(calculateScore(100, 1, 0), 77800);
+  assert.equal(calculateScore(100, 0, 1), 82900);
+  assert.equal(calculateScore(10000, 99, 0), 0);
   assert.equal(formatScore(42.9), '000042');
-});
-
-test('mulberry32 always returns normalized values', () => {
-  const random = mulberry32(1);
-  for (let index = 0; index < 1000; index += 1) {
-    const value = random();
-    assert.ok(value >= 0 && value < 1);
-  }
 });

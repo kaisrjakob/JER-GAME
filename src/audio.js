@@ -67,9 +67,12 @@ export class AudioEngine {
 
   sfx(name) {
     if (!this.context || this.settings.muted) return;
-    if (name === 'gate') {
+    if (name === 'gate' || name === 'service') {
       this.tone(520, 0.1, 0.12, 'sine', this.sfxGain);
       this.tone(780, 0.16, 0.07, 'triangle', this.sfxGain, 0.055);
+    } else if (name === 'jump') {
+      this.tone(190, 0.08, 0.08, 'triangle', this.sfxGain);
+      this.tone(330, 0.09, 0.05, 'sine', this.sfxGain, 0.035);
     } else if (name === 'charge') {
       this.tone(260, 0.08, 0.12, 'sawtooth', this.sfxGain);
       this.tone(620, 0.22, 0.08, 'sine', this.sfxGain, 0.06);
@@ -78,7 +81,7 @@ export class AudioEngine {
     } else if (name === 'hit') {
       this.noise(0.28, 0.22, this.sfxGain);
       this.tone(62, 0.3, 0.24, 'sawtooth', this.sfxGain);
-    } else if (name === 'world') {
+    } else if (name === 'world' || name === 'stage') {
       [180, 270, 405].forEach((frequency, index) => this.tone(frequency, 0.24, 0.08, 'triangle', this.sfxGain, index * 0.1));
     }
   }

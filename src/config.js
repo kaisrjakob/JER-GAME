@@ -1,59 +1,60 @@
-export const TAU = Math.PI * 2;
-export const WORLD_DISTANCE = 2800;
-export const CAMPAIGN_END = WORLD_DISTANCE * 3;
+export const VIEW_WIDTH = 1600;
+export const VIEW_HEIGHT = 900;
+export const PLAYER_WIDTH = 54;
+export const PLAYER_HEIGHT = 82;
+export const LEVEL_END = 7200;
+
 export const STORAGE_KEYS = {
-  highScore: 'jeremias-draught-rider.highScore.v1',
-  settings: 'jeremias-draught-rider.settings.v1',
-  tutorial: 'jeremias-draught-rider.tutorialSeen.v1'
+  highScore: 'jeremias-unfair-service.bestScore.v1',
+  settings: 'jeremias-unfair-service.settings.v1',
+  tutorial: 'jeremias-unfair-service.finished.v1'
 };
 
-export const WORLDS = [
+export const SECTIONS = [
   {
     id: 'dw-fu',
+    from: 0,
     title: 'DW-FU',
-    kicker: 'ELEMENTSCHORNSTEIN',
-    copy: 'Präzision beginnt im Detail.',
-    hud: 'DW-FU // FLOW 01',
-    asset: 'assets/world-dw.jpg',
-    colors: ['#081b33', '#2b77b4', '#a9d8ff'],
-    speed: 78,
-    ringSpacing: 115
+    kicker: 'ABSCHNITT 01 // ELEMENTSCHORNSTEIN',
+    copy: 'Klemmbänder, Dachkanten und die erste Gemeinheit.',
+    asset: 'assets/world-dw.jpg'
   },
   {
     id: 'dw-vision',
+    from: 2400,
     title: 'DW-VISION',
-    kicker: 'DESIGN & DYNAMIK',
-    copy: 'Folge jedem Versatz.',
-    hud: 'DW-VISION // FLOW 02',
-    asset: 'assets/world-vision.jpg',
-    colors: ['#07172e', '#296ea5', '#d7e9f8'],
-    speed: 86,
-    ringSpacing: 108
+    kicker: 'ABSCHNITT 02 // DESIGNSTRECKE',
+    copy: 'Versätze sehen harmloser aus, als sie sind.',
+    asset: 'assets/world-vision.jpg'
   },
   {
     id: 'fsa-x',
+    from: 4800,
     title: 'FSA-X',
-    kicker: 'INDUSTRIESCHORNSTEIN',
-    copy: 'Große Dimension. Volle Kontrolle.',
-    hud: 'FSA-X // FLOW 03',
-    asset: 'assets/world-industry.jpg',
-    colors: ['#050d22', '#154c86', '#a5c9e9'],
-    speed: 94,
-    ringSpacing: 102
+    kicker: 'ABSCHNITT 03 // INDUSTRIE',
+    copy: 'Große Dimensionen. Größere Fallen.',
+    asset: 'assets/world-industry.jpg'
   }
 ];
 
-export function worldIndexForDistance(distance) {
-  if (distance < CAMPAIGN_END) return Math.min(2, Math.floor(distance / WORLD_DISTANCE));
-  return Math.floor((distance - CAMPAIGN_END) / 2200) % WORLDS.length;
-}
+export const DEATH_MESSAGES = [
+  'JETZT KENNST DU DIE STELLE.',
+  'FALLE DOKUMENTIERT. NOCH EINMAL.',
+  'DER SERVICE GIBT NICHT AUF.',
+  'KLEMMBAND FEST. NERVEN AUCH?',
+  'DIE NACHTSCHICHT GEHT WEITER.'
+];
 
-export function difficultyForDistance(distance) {
-  const campaign = Math.min(1, distance / CAMPAIGN_END);
-  const endless = Math.max(0, distance - CAMPAIGN_END) / 9000;
-  return Math.min(2.25, 0.2 + campaign * 0.8 + endless);
+export function sectionIndexForX(x) {
+  if (x >= SECTIONS[2].from) return 2;
+  if (x >= SECTIONS[1].from) return 1;
+  return 0;
 }
 
 export function formatScore(value) {
   return String(Math.max(0, Math.floor(value))).padStart(6, '0');
+}
+
+export function calculateScore(elapsed, deaths, bands) {
+  return Math.max(0, 100000 - Math.floor(elapsed * 180) - deaths * 4200 + bands * 900);
 }

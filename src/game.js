@@ -1,452 +1,502 @@
 import { AudioEngine } from './audio.js';
-import { CAMPAIGN_END, WORLDS, formatScore, worldIndexForDistance } from './config.js';
-import { TunnelRenderer } from './renderer.js';
-import { loadHighScore, loadSettings, markTutorialSeen, saveHighScore, saveSettings, tutorialSeen } from './storage.js';
-import { TrackGenerator, classifyPass, normalizeAngle } from './track.js';
+import {
+  DEATH_MESSAGES, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, SECTIONS, VIEW_HEIGHT,
+  calculateScore, formatScore, sectionIndexForX
+} from './config.js';
+import { UnfairRenderer } from './renderer.js';
+import { loadHighScore, loadSettings, saveHighScore, saveSettings } from './storage.js';
+import { activeTrapBox, createLevel, overlaps } from './track.js';
 
-const FIXED_STEP = 1 / 120;
+const STEP = 1 / 120;
+const GRAVITY = 2050;
+const JUMP_SPEED = 760;
+const RUN_SPEED = 330;
 
-export class DraughtRider {
+export class UnfairJeremias {
   constructor(canvas) {
     this.canvas = canvas;
     this.settings = loadSettings();
-    this.highScore = loadHighScore();
-    this.renderer = new TunnelRenderer(canvas, this.settings);
+    this.bestScore = loadHighScore();
     this.audio = new AudioEngine(this.settings);
-    this.input = new InputController(canvas, () => this.togglePause());
+    this.renderer = new UnfairRenderer(canvas, this.settings);
     this.state = null;
-    this.generator = null;
+    this.ui = this.collectUi();
     this.lastTime = performance.now();
     this.accumulator = 0;
-    this.animationFrame = 0;
-    this.toastTimer = 0;
-    this.worldCardTimer = 0;
+    this.cardTimer = 0;
     this.calloutTimer = 0;
-    this.ui = this.collectUi();
+    this.input = new PlatformInput({
+      canvas,
+      jump: () => this.requestJump(),
+      releaseJump: () => this.releaseJump(),
+      restart: () => this.restartFromCheckpoint(),
+      pause: () => this.togglePause()
+    });
   }
 
   collectUi() {
     const ids = [
-      'loading-screen', 'loading-progress', 'menu-screen', 'menu-highscore', 'how-screen',
-      'start-button', 'how-button', 'settings-button', 'settings-screen', 'music-range',
-      'sfx-range', 'motion-toggle', 'control-select', 'hud', 'hud-world', 'score', 'multiplier', 'speed-label',
-      'boost-fill', 'stability-bars', 'campaign-progress', 'audio-button', 'pause-button',
-      'pause-screen', 'resume-button', 'restart-pause-button', 'settings-pause-button', 'menu-pause-button',
-      'gameover-screen', 'final-score', 'final-distance', 'final-gates', 'final-combo',
-      'result-kicker', 'result-title', 'new-best', 'restart-button', 'menu-button',
-      'world-card', 'world-index', 'world-kicker', 'world-title', 'world-copy',
-      'combo-callout', 'flash', 'toast'
+      'loading-screen', 'loading-progress', 'menu-screen', 'menu-highscore', 'start-button',
+      'how-button', 'how-screen', 'hud', 'hud-section', 'timer', 'death-count', 'band-count',
+      'campaign-progress', 'audio-button', 'pause-button', 'ready-overlay', 'death-overlay',
+      'death-message', 'pause-screen', 'resume-button', 'restart-pause-button', 'menu-pause-button',
+      'win-screen', 'final-score', 'final-time', 'final-deaths', 'final-bands', 'new-best',
+      'restart-button', 'menu-button', 'section-card', 'section-kicker', 'section-title',
+      'section-copy', 'callout', 'flash', 'touch-left', 'touch-right', 'touch-jump'
     ];
-    return Object.fromEntries(ids.map((id) => [toCamel(id), document.getElementById(id)]));
+    return Object.fromEntries(ids.map((id) => [camel(id), document.getElementById(id)]));
   }
 
   async boot() {
     this.bindUi();
-    this.ui.menuHighscore.textContent = formatScore(this.highScore);
+    this.ui.menuHighscore.textContent = formatScore(this.bestScore);
     this.ui.audioButton.textContent = this.settings.muted ? '×' : '♫';
-    await this.renderer.load((value) => {
-      this.ui.loadingProgress.style.width = Math.round(value * 100) + '%';
+    await this.renderer.load((progress) => {
+      this.ui.loadingProgress.style.width = Math.round(progress * 100) + '%';
     });
-    await new Promise((resolve) => setTimeout(resolve, 280));
-    this.showOnly('menuScreen');
-    this.ui.loadingScreen.classList.remove('screen--active');
-    document.querySelector('.site-footer').style.display = '';
-    this.animationFrame = requestAnimationFrame((time) => this.frame(time));
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    this.showOnly(this.ui.menuScreen);
+    requestAnimationFrame((time) => this.frame(time));
   }
 
   bindUi() {
     this.ui.startButton.addEventListener('click', () => this.start());
     this.ui.howButton.addEventListener('click', () => this.ui.howScreen.classList.add('screen--active'));
-    this.ui.settingsButton.addEventListener('click', () => this.openSettings());
-    this.ui.settingsPauseButton.addEventListener('click', () => this.openSettings());
     document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => {
       document.getElementById(button.dataset.close).classList.remove('screen--active');
     }));
     this.ui.pauseButton.addEventListener('click', () => this.pause());
     this.ui.resumeButton.addEventListener('click', () => this.resume());
-    this.ui.restartPauseButton.addEventListener('click', () => this.start());
+    this.ui.restartPauseButton.addEventListener('click', () => this.restartFromCheckpoint());
     this.ui.menuPauseButton.addEventListener('click', () => this.toMenu());
     this.ui.restartButton.addEventListener('click', () => this.start());
     this.ui.menuButton.addEventListener('click', () => this.toMenu());
     this.ui.audioButton.addEventListener('click', () => {
       const muted = this.audio.toggleMute();
       this.ui.audioButton.textContent = muted ? '×' : '♫';
-      this.ui.audioButton.setAttribute('aria-label', muted ? 'Audio einschalten' : 'Audio stummschalten');
       saveSettings(this.settings);
     });
-    this.ui.musicRange.addEventListener('input', () => this.updateSettings());
-    this.ui.sfxRange.addEventListener('input', () => this.updateSettings());
-    this.ui.motionToggle.addEventListener('change', () => this.updateSettings());
-    this.ui.controlSelect.addEventListener('change', () => this.updateSettings());
+    bindHold(this.ui.touchLeft, (pressed) => { this.input.left = pressed; });
+    bindHold(this.ui.touchRight, (pressed) => { this.input.right = pressed; });
+    this.ui.touchJump.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      this.requestJump();
+    });
+    this.ui.touchJump.addEventListener('pointerup', () => this.releaseJump());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && this.state?.mode === 'playing') this.pause();
     });
   }
 
   async start() {
-    this.generator = new TrackGenerator((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
     this.state = {
-      mode: 'playing',
-      distance: 0,
-      score: 0,
-      speed: WORLDS[0].speed,
-      boost: 100,
-      stability: 3,
-      angle: -Math.PI / 2,
-      angularVelocity: 0,
-      multiplier: 1,
-      maxMultiplier: 1,
-      gates: 0,
-      nearMisses: 0,
-      objects: [],
-      hitTimer: 0,
-      runTime: 0,
-      worldIndex: 0,
-      zone: 0,
-      endless: false,
-      renderDelta: 0.016,
-      tutorialStep: tutorialSeen() ? 99 : 0
+      mode: 'ready',
+      level: createLevel(),
+      elapsed: 0,
+      deaths: 0,
+      bands: 0,
+      section: 0,
+      checkpoint: { x: 120, y: 700 - PLAYER_HEIGHT, id: null },
+      cameraX: 0,
+      renderDelta: .016,
+      respawnTimer: 0,
+      player: this.makePlayer(120, 700 - PLAYER_HEIGHT)
     };
-    this.state.objects.push(...this.generator.fill(0));
-    this.input.reset();
     this.hideScreens();
     this.ui.hud.classList.add('hud--active');
+    this.ui.readyOverlay.classList.add('ready-overlay--active');
+    this.ui.deathOverlay.classList.remove('death-overlay--active');
     document.querySelector('.site-footer').style.display = 'none';
-    this.showWorld(0);
-    await this.audio.start();
-    this.audio.sfx('world');
+    this.updateHud();
+    await this.audio.ensure();
     this.lastTime = performance.now();
     this.accumulator = 0;
   }
 
+  makePlayer(x, y) {
+    return {
+      x, y,
+      width: PLAYER_WIDTH,
+      height: PLAYER_HEIGHT,
+      vx: 0,
+      vy: 0,
+      facing: 1,
+      onGround: true,
+      coyote: .1,
+      jumpBuffer: 0,
+      invulnerable: 0
+    };
+  }
+
+  requestJump() {
+    if (!this.state) return;
+    if (this.state.mode === 'ready') {
+      this.state.mode = 'playing';
+      this.ui.readyOverlay.classList.remove('ready-overlay--active');
+      this.audio.start();
+      this.showSection(0);
+    }
+    if (this.state.mode === 'playing') this.state.player.jumpBuffer = .14;
+  }
+
+  releaseJump() {
+    if (this.state?.player.vy < -250) this.state.player.vy = -250;
+  }
+
   update(dt) {
     const state = this.state;
-    if (!state || state.mode !== 'playing') return;
-    state.runTime += dt;
-    state.hitTimer = Math.max(0, state.hitTimer - dt);
-    state.renderDelta = dt;
-
-    this.updateSteering(dt);
-    const world = WORLDS[worldIndexForDistance(state.distance)];
-    const endlessRamp = state.distance > CAMPAIGN_END ? Math.min(38, (state.distance - CAMPAIGN_END) / 240) : 0;
-    const boosting = this.input.boost && state.boost > 0.5;
-    const braking = this.input.brake;
-    let targetSpeed = world.speed + endlessRamp;
-    if (boosting) {
-      targetSpeed += 48;
-      state.boost = Math.max(0, state.boost - dt * 24);
-    } else {
-      state.boost = Math.min(100, state.boost + dt * (braking ? 12 : 7));
+    if (!state) return;
+    if (state.mode === 'dead') {
+      state.respawnTimer -= dt;
+      if (state.respawnTimer <= 0) this.respawn();
+      return;
     }
-    if (braking) targetSpeed -= 28;
-    state.speed += (targetSpeed - state.speed) * Math.min(1, dt * 3.4);
-    state.distance += state.speed * dt;
-    state.score += state.speed * dt * 0.17 * state.multiplier;
+    if (state.mode !== 'playing') return;
 
-    state.objects.push(...this.generator.fill(state.distance));
-    for (const object of state.objects) {
-      if (!object.processed && object.distance - state.distance <= 24) {
-        object.processed = true;
-        this.resolveObject(object);
+    state.elapsed += dt;
+    state.renderDelta = dt;
+    const player = state.player;
+    player.invulnerable = Math.max(0, player.invulnerable - dt);
+    player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
+    player.coyote = player.onGround ? .11 : Math.max(0, player.coyote - dt);
+
+    const direction = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
+    if (direction !== 0) {
+      player.vx += direction * 1900 * dt;
+      player.facing = direction;
+    } else {
+      player.vx *= Math.pow(.0007, dt);
+    }
+    player.vx = Math.max(-RUN_SPEED, Math.min(RUN_SPEED, player.vx));
+    if (player.jumpBuffer > 0 && (player.onGround || player.coyote > 0)) {
+      player.vy = -JUMP_SPEED;
+      player.onGround = false;
+      player.coyote = 0;
+      player.jumpBuffer = 0;
+      this.audio.sfx('jump');
+      this.renderer.emit(player.x + 26, player.y + PLAYER_HEIGHT, '#62c8ff', 9);
+    }
+
+    this.updatePlatforms(dt);
+    this.updateTraps(dt);
+
+    player.x += player.vx * dt;
+    player.x = Math.max(-100, player.x);
+    const previousBottom = player.y + PLAYER_HEIGHT;
+    player.vy += GRAVITY * dt;
+    player.y += player.vy * dt;
+    player.onGround = false;
+    let standingPlatform = null;
+    for (const platform of state.level.platforms) {
+      const y = platform.y + platform.fallY;
+      const horizontal = player.x + PLAYER_WIDTH - 8 > platform.x && player.x + 8 < platform.x + platform.width;
+      const bottom = player.y + PLAYER_HEIGHT;
+      if (horizontal && player.vy >= 0 && previousBottom <= y + 5 && bottom >= y) {
+        player.y = y - PLAYER_HEIGHT;
+        player.vy = 0;
+        player.onGround = true;
+        standingPlatform = platform;
+        break;
       }
     }
-    state.objects = state.objects.filter((object) => object.distance > state.distance - 180);
-
-    const zone = state.distance < CAMPAIGN_END ? Math.floor(state.distance / 2800) : 3 + Math.floor((state.distance - CAMPAIGN_END) / 2200);
-    if (zone !== state.zone) {
-      state.zone = zone;
-      if (zone < 3) this.showWorld(zone);
-      else if (zone === 3) this.showEndless();
-      else this.showWorld(worldIndexForDistance(state.distance), 'ENDLESS SEKTOR ' + String(zone - 2).padStart(2, '0'));
+    if (standingPlatform?.collapsible && !standingPlatform.triggered) {
+      standingPlatform.triggered = true;
+      standingPlatform.timer = 0;
+      this.callout('DAS WAR ZU EINFACH …');
     }
-    state.worldIndex = worldIndexForDistance(state.distance);
-    state.endless = state.distance >= CAMPAIGN_END;
-    this.audio.setIntensity(Math.min(1, (state.speed - 70) / 70));
-    this.updateTutorial();
+
+    this.checkTrapCollisions();
+    this.checkBands();
+    this.checkCheckpoints();
+
+    if (player.y > VIEW_HEIGHT + 140) this.kill('ABSTURZ ZWISCHEN DEN ABGASSYSTEMEN');
+    if (player.x >= state.level.finish.x + 105 && player.y < state.level.finish.y) this.win();
+
+    const section = sectionIndexForX(player.x);
+    if (section !== state.section) {
+      state.section = section;
+      this.showSection(section);
+    }
+    const targetCamera = Math.max(0, Math.min(LEVEL_END - 1100, player.x - 420));
+    state.cameraX += (targetCamera - state.cameraX) * Math.min(1, dt * 4.8);
+    this.audio.setIntensity(.35 + section * .25);
     this.updateHud();
   }
 
-  updateSteering(dt) {
+  updatePlatforms(dt) {
+    for (const platform of this.state.level.platforms) {
+      if (platform.moving && !platform.triggered) {
+        platform.fallY = Math.sin(this.state.elapsed * 1.6) * 52;
+      }
+      if (platform.collapsible && platform.triggered) {
+        platform.timer += dt;
+        if (platform.timer > .48) {
+          platform.fallSpeed += 1250 * dt;
+          platform.fallY += platform.fallSpeed * dt;
+        }
+      }
+    }
+  }
+
+  updateTraps(dt) {
+    const playerX = this.state.player.x;
+    for (const trap of this.state.level.traps) {
+      if (!trap.triggered && playerX >= trap.triggerX) {
+        trap.triggered = true;
+        if (trap.type === 'spikes') this.audio.sfx('near');
+      }
+      if (!trap.triggered) continue;
+      if (trap.type === 'spikes') trap.progress = Math.min(1, trap.progress + dt * 4.8);
+      if (trap.type === 'fallingPipe') {
+        trap.vy += 1500 * dt;
+        trap.y = Math.min(trap.floorY - trap.height, trap.y + trap.vy * dt);
+      }
+      if (trap.type === 'pressure') trap.timer += dt;
+    }
+  }
+
+  checkTrapCollisions() {
     const state = this.state;
-    const keyboard = this.settings.control === 'pointer' ? 0 : (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
-    if (keyboard !== 0) {
-      state.angularVelocity += keyboard * dt * 9.5;
-      this.input.pointerActive = false;
-    } else {
-      state.angularVelocity *= Math.pow(0.04, dt);
-    }
-    state.angularVelocity = Math.max(-3.15, Math.min(3.15, state.angularVelocity));
-    state.angle = normalizeAngle(state.angle + state.angularVelocity * dt);
-    if (this.input.pointerActive && this.settings.control !== 'keyboard') {
-      const difference = normalizeAngle(this.input.pointerAngle - state.angle);
-      state.angle = normalizeAngle(state.angle + difference * Math.min(1, dt * 8.5));
-    }
-  }
-
-  openSettings() {
-    this.ui.musicRange.value = String(Math.round(this.settings.music * 100));
-    this.ui.sfxRange.value = String(Math.round(this.settings.sfx * 100));
-    this.ui.motionToggle.checked = this.settings.reducedMotion;
-    this.ui.controlSelect.value = this.settings.control;
-    this.ui.settingsScreen.classList.add('screen--active');
-  }
-
-  updateSettings() {
-    this.settings.music = Number(this.ui.musicRange.value) / 100;
-    this.settings.sfx = Number(this.ui.sfxRange.value) / 100;
-    this.settings.reducedMotion = this.ui.motionToggle.checked;
-    this.settings.control = this.ui.controlSelect.value;
-    this.audio.applySettings();
-    saveSettings(this.settings);
-  }
-
-  resolveObject(object) {
-    const result = classifyPass(object, this.state.angle);
-    if (result === 'perfect') {
-      this.state.gates += 1;
-      this.state.multiplier = Math.min(8, this.state.multiplier + 0.25);
-      this.state.maxMultiplier = Math.max(this.state.maxMultiplier, this.state.multiplier);
-      this.state.score += 250 * this.state.multiplier;
-      this.state.boost = Math.min(100, this.state.boost + 5);
-      this.renderer.emit('gate', object.angle);
-      this.audio.sfx('gate');
-      this.callout(this.state.multiplier >= 4 ? 'MAXIMUM FLOW' : 'PERFECT FLOW');
-    } else if (result === 'charge') {
-      this.state.boost = Math.min(100, this.state.boost + 32);
-      this.state.score += 120 * this.state.multiplier;
-      this.renderer.emit('charge', object.angle);
-      this.audio.sfx('charge');
-      this.callout('BOOST +32');
-    } else if (result === 'near') {
-      this.state.nearMisses += 1;
-      this.state.multiplier = Math.min(8, this.state.multiplier + 0.15);
-      this.state.maxMultiplier = Math.max(this.state.maxMultiplier, this.state.multiplier);
-      this.state.score += 160 * this.state.multiplier;
-      this.renderer.emit('gate', object.angle);
-      this.audio.sfx('near');
-      this.callout('CLOSE FLOW +160');
-    } else if (result === 'hit') {
-      this.hit(object.angle);
+    const player = state.player;
+    const playerBox = { x: player.x + 8, y: player.y + 5, width: PLAYER_WIDTH - 16, height: PLAYER_HEIGHT - 7 };
+    for (const trap of state.level.traps) {
+      const box = activeTrapBox(trap);
+      if (box && overlaps(playerBox, box)) {
+        this.kill(trap.type === 'spikes' ? 'KAMINHAUBE VON UNTEN. GEMEIN.' : 'DW-ELEMENT IM ANFLUG');
+        return;
+      }
+      if (trap.type === 'pressure' && trap.triggered && trap.timer > .28 && trap.timer < 1.1) {
+        const blast = { x: trap.x - 190, y: trap.y - 170, width: 210, height: 130 };
+        if (overlaps(playerBox, blast)) {
+          this.kill('DRUCKSTOSS AUS DER PRÜFÖFFNUNG');
+          return;
+        }
+      }
     }
   }
 
-  hit(angle) {
-    if (this.state.hitTimer > 0) return;
-    this.state.stability -= 1;
-    this.state.multiplier = 1;
-    this.state.speed *= 0.62;
-    this.state.boost = Math.max(0, this.state.boost - 22);
-    this.state.hitTimer = 1.15;
-    this.renderer.emit('hit', angle);
+  checkBands() {
+    const player = this.state.player;
+    const box = { x: player.x, y: player.y, width: PLAYER_WIDTH, height: PLAYER_HEIGHT };
+    for (const band of this.state.level.bands) {
+      if (band.collected) continue;
+      if (overlaps(box, { x: band.x - 28, y: band.y - 28, width: 56, height: 56 })) {
+        band.collected = true;
+        this.state.bands += 1;
+        this.audio.sfx('charge');
+        this.renderer.emit(band.x, band.y, '#ff8a24', 18);
+        this.callout('KLEMMBAND GESICHERT  +900');
+      }
+    }
+  }
+
+  checkCheckpoints() {
+    for (const checkpoint of this.state.level.checkpoints) {
+      if (!checkpoint.active && this.state.player.x >= checkpoint.x) {
+        checkpoint.active = true;
+        const platform = this.state.level.platforms.find((item) => checkpoint.x >= item.x && checkpoint.x < item.x + item.width);
+        this.state.checkpoint = {
+          id: checkpoint.id,
+          x: checkpoint.x + 28,
+          y: (platform?.y || checkpoint.y) - PLAYER_HEIGHT
+        };
+        this.audio.sfx('stage');
+        this.callout('JEREMIAS SERVICEPUNKT AKTIV');
+      }
+    }
+  }
+
+  kill(reason) {
+    if (!this.state || this.state.mode !== 'playing') return;
+    this.state.mode = 'dead';
+    this.state.deaths += 1;
+    this.state.respawnTimer = 1.05;
     this.audio.sfx('hit');
+    this.ui.deathMessage.textContent = reason + ' — ' + DEATH_MESSAGES[(this.state.deaths - 1) % DEATH_MESSAGES.length];
+    this.ui.deathOverlay.classList.add('death-overlay--active');
     this.ui.flash.classList.remove('hit');
     void this.ui.flash.offsetWidth;
     this.ui.flash.classList.add('hit');
-    this.callout(this.state.stability ? 'STRÖMUNG KORRIGIEREN' : 'FLOW ABGERISSEN');
-    if (this.state.stability <= 0) window.setTimeout(() => this.endGame(), 420);
+    this.updateHud();
   }
 
-  updateTutorial() {
-    const state = this.state;
-    if (state.tutorialStep === 0 && state.runTime > 1.2) {
-      this.toast('MAUS ODER A / D — LINIE HALTEN', 3000);
-      state.tutorialStep = 1;
-    } else if (state.tutorialStep === 1 && state.runTime > 5.2) {
-      this.toast('DURCH DIE BLAUEN STRÖMUNGSTORE', 2800);
-      state.tutorialStep = 2;
-    } else if (state.tutorialStep === 2 && state.runTime > 10) {
-      this.toast('W / LEERTASTE — BOOST ZÜNDEN', 2800);
-      state.tutorialStep = 3;
-      markTutorialSeen();
+  respawn() {
+    const deaths = this.state.deaths;
+    const elapsed = this.state.elapsed;
+    const bands = this.state.bands;
+    const collected = this.state.level.bands.map((band) => band.collected);
+    const checkpoint = this.state.checkpoint;
+    const level = createLevel();
+    collected.forEach((value, index) => { if (level.bands[index]) level.bands[index].collected = value; });
+    level.checkpoints.forEach((item) => { item.active = checkpoint.id && item.x <= checkpoint.x; });
+    this.state.level = level;
+    this.state.deaths = deaths;
+    this.state.elapsed = elapsed;
+    this.state.bands = bands;
+    this.state.player = this.makePlayer(checkpoint.x, checkpoint.y);
+    this.state.player.invulnerable = .65;
+    this.state.cameraX = Math.max(0, checkpoint.x - 420);
+    this.state.mode = 'playing';
+    this.ui.deathOverlay.classList.remove('death-overlay--active');
+  }
+
+  restartFromCheckpoint() {
+    if (!this.state || this.state.mode === 'menu') return;
+    if (this.state.mode === 'paused') {
+      this.ui.pauseScreen.classList.remove('screen--active');
+      this.state.mode = 'playing';
     }
+    this.kill('MANUELLER NEUSTART');
+    if (this.state.mode === 'dead') this.state.respawnTimer = .05;
+  }
+
+  win() {
+    if (this.state.mode !== 'playing') return;
+    this.state.mode = 'won';
+    this.audio.stop();
+    this.audio.sfx('stage');
+    const score = calculateScore(this.state.elapsed, this.state.deaths, this.state.bands);
+    const best = score > this.bestScore;
+    if (best) {
+      this.bestScore = score;
+      saveHighScore(score);
+    }
+    this.ui.finalScore.textContent = formatScore(score);
+    this.ui.finalTime.textContent = formatTime(this.state.elapsed);
+    this.ui.finalDeaths.textContent = String(this.state.deaths);
+    this.ui.finalBands.textContent = this.state.bands + ' / ' + this.state.level.bands.length;
+    this.ui.newBest.classList.toggle('show', best);
+    this.ui.winScreen.classList.add('screen--active');
   }
 
   updateHud() {
     const state = this.state;
-    this.ui.score.textContent = formatScore(state.score);
-    this.ui.multiplier.textContent = '×' + state.multiplier.toFixed(1);
-    this.ui.speedLabel.textContent = String(Math.round(state.speed * 2.45)).padStart(3, '0') + ' KM/H';
-    this.ui.boostFill.style.width = state.boost + '%';
-    this.ui.hudWorld.textContent = state.endless ? WORLDS[state.worldIndex].title + ' // ENDLESS' : WORLDS[state.worldIndex].hud;
-    [...this.ui.stabilityBars.children].forEach((bar, index) => bar.classList.toggle('off', index >= state.stability));
-    this.ui.campaignProgress.style.width = Math.min(100, state.distance / CAMPAIGN_END * 100) + '%';
+    this.ui.timer.textContent = formatTime(state.elapsed);
+    this.ui.deathCount.textContent = String(state.deaths).padStart(2, '0');
+    this.ui.bandCount.textContent = state.bands + ' / ' + state.level.bands.length;
+    this.ui.hudSection.textContent = SECTIONS[state.section].title + ' // ' + SECTIONS[state.section].kicker.split('//')[0].trim();
+    this.ui.campaignProgress.style.width = Math.max(0, Math.min(100, state.player.x / LEVEL_END * 100)) + '%';
   }
 
-  showWorld(index, kickerOverride) {
-    const world = WORLDS[index];
-    this.ui.worldIndex.textContent = String(index + 1).padStart(2, '0');
-    this.ui.worldKicker.textContent = kickerOverride || world.kicker;
-    this.ui.worldTitle.textContent = world.title;
-    this.ui.worldCopy.textContent = world.copy;
-    this.ui.worldCard.classList.add('show');
-    clearTimeout(this.worldCardTimer);
-    this.worldCardTimer = setTimeout(() => this.ui.worldCard.classList.remove('show'), 2700);
-    if (this.state?.runTime > 1) this.audio.sfx('world');
-  }
-
-  showEndless() {
-    this.ui.worldIndex.textContent = '∞';
-    this.ui.worldKicker.textContent = 'KAMPAGNE GEMEISTERT';
-    this.ui.worldTitle.textContent = 'ENDLESS FLOW';
-    this.ui.worldCopy.textContent = 'Wie weit trägt dich deine Linie?';
-    this.ui.worldCard.classList.add('show');
-    clearTimeout(this.worldCardTimer);
-    this.worldCardTimer = setTimeout(() => this.ui.worldCard.classList.remove('show'), 3400);
-    this.audio.sfx('world');
-    this.toast('ENDLESS FLOW FREIGESCHALTET', 3200);
+  showSection(index) {
+    const section = SECTIONS[index];
+    this.ui.sectionKicker.textContent = section.kicker;
+    this.ui.sectionTitle.textContent = section.title;
+    this.ui.sectionCopy.textContent = section.copy;
+    this.ui.sectionCard.classList.add('show');
+    clearTimeout(this.cardTimer);
+    this.cardTimer = setTimeout(() => this.ui.sectionCard.classList.remove('show'), 2600);
+    this.audio.sfx('stage');
   }
 
   callout(text) {
-    this.ui.comboCallout.textContent = text;
-    this.ui.comboCallout.classList.add('show');
+    this.ui.callout.textContent = text;
+    this.ui.callout.classList.add('show');
     clearTimeout(this.calloutTimer);
-    this.calloutTimer = setTimeout(() => this.ui.comboCallout.classList.remove('show'), 700);
-  }
-
-  toast(text, duration = 2200) {
-    this.ui.toast.textContent = text;
-    this.ui.toast.classList.add('show');
-    clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => this.ui.toast.classList.remove('show'), duration);
+    this.calloutTimer = setTimeout(() => this.ui.callout.classList.remove('show'), 1050);
   }
 
   pause() {
-    if (!this.state || this.state.mode !== 'playing') return;
+    if (!this.state || !['playing', 'ready'].includes(this.state.mode)) return;
+    this.state.previousMode = this.state.mode;
     this.state.mode = 'paused';
     this.ui.pauseScreen.classList.add('screen--active');
     this.audio.stop();
   }
 
   async resume() {
-    if (!this.state || this.state.mode !== 'paused') return;
+    if (this.state?.mode !== 'paused') return;
+    this.state.mode = this.state.previousMode || 'playing';
     this.ui.pauseScreen.classList.remove('screen--active');
-    this.state.mode = 'playing';
     this.lastTime = performance.now();
     this.accumulator = 0;
-    await this.audio.start();
+    if (this.state.mode === 'playing') await this.audio.start();
   }
 
   togglePause() {
-    if (this.state?.mode === 'playing') this.pause();
-    else if (this.state?.mode === 'paused') this.resume();
-  }
-
-  endGame() {
-    if (!this.state || this.state.mode === 'gameOver') return;
-    this.state.mode = 'gameOver';
-    this.audio.stop();
-    const score = Math.floor(this.state.score);
-    const isBest = score > this.highScore;
-    if (isBest) {
-      this.highScore = score;
-      saveHighScore(score);
-    }
-    this.ui.finalScore.textContent = formatScore(score);
-    this.ui.finalDistance.textContent = Math.floor(this.state.distance / 10) + ' M';
-    this.ui.finalGates.textContent = String(this.state.gates);
-    this.ui.finalCombo.textContent = '×' + this.state.maxMultiplier.toFixed(1);
-    this.ui.newBest.classList.toggle('show', isBest);
-    this.ui.resultKicker.textContent = this.state.endless ? 'ENDLESS FLOW' : 'FLOW BEENDET';
-    this.ui.resultTitle.textContent = this.state.endless ? 'Grenzen verschoben.' : 'Starke Linie.';
-    this.ui.gameoverScreen.classList.add('screen--active');
+    if (this.state?.mode === 'paused') this.resume();
+    else this.pause();
   }
 
   toMenu() {
     this.audio.stop();
     if (this.state) this.state.mode = 'menu';
     this.hideScreens();
-    this.ui.menuScreen.classList.add('screen--active');
     this.ui.hud.classList.remove('hud--active');
-    this.ui.menuHighscore.textContent = formatScore(this.highScore);
+    this.ui.readyOverlay.classList.remove('ready-overlay--active');
+    this.ui.deathOverlay.classList.remove('death-overlay--active');
+    this.ui.menuHighscore.textContent = formatScore(this.bestScore);
+    this.ui.menuScreen.classList.add('screen--active');
     document.querySelector('.site-footer').style.display = '';
   }
 
   hideScreens() {
     document.querySelectorAll('.screen').forEach((screen) => screen.classList.remove('screen--active'));
-    this.ui.worldCard.classList.remove('show');
-    this.ui.toast.classList.remove('show');
+    this.ui.sectionCard.classList.remove('show');
+    this.ui.callout.classList.remove('show');
   }
 
-  showOnly(key) {
+  showOnly(screen) {
     this.hideScreens();
-    this.ui[key].classList.add('screen--active');
+    screen.classList.add('screen--active');
   }
 
   frame(time) {
-    const delta = Math.min(0.05, Math.max(0, (time - this.lastTime) / 1000));
+    const dt = Math.min(.05, Math.max(0, (time - this.lastTime) / 1000));
     this.lastTime = time;
-    if (this.state?.mode === 'playing') {
-      this.accumulator += delta;
-      while (this.accumulator >= FIXED_STEP) {
-        this.update(FIXED_STEP);
-        this.accumulator -= FIXED_STEP;
+    if (this.state && ['playing', 'dead'].includes(this.state.mode)) {
+      this.accumulator += dt;
+      while (this.accumulator >= STEP) {
+        this.update(STEP);
+        this.accumulator -= STEP;
       }
     }
     if (this.state) {
-      this.state.renderDelta = delta;
+      this.state.renderDelta = dt;
       this.renderer.render(this.state, time);
     }
-    this.animationFrame = requestAnimationFrame((nextTime) => this.frame(nextTime));
+    requestAnimationFrame((next) => this.frame(next));
   }
 }
 
-class InputController {
-  constructor(canvas, onPause) {
-    this.canvas = canvas;
+class PlatformInput {
+  constructor({ canvas, jump, releaseJump, restart, pause }) {
     this.left = false;
     this.right = false;
-    this.boost = false;
-    this.brake = false;
-    this.pointerActive = false;
-    this.pointerAngle = -Math.PI / 2;
-    this.touchBoost = false;
-    const setKey = (event, pressed) => {
-      const code = event.code;
-      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', 'KeyA', 'KeyD', 'KeyW', 'KeyS'].includes(code)) event.preventDefault();
-      if (code === 'ArrowLeft' || code === 'KeyA') this.left = pressed;
-      if (code === 'ArrowRight' || code === 'KeyD') this.right = pressed;
-      if (code === 'ArrowUp' || code === 'KeyW' || code === 'Space') this.boost = pressed;
-      if (code === 'ArrowDown' || code === 'KeyS') this.brake = pressed;
-      if (pressed && (code === 'Escape' || code === 'KeyP')) onPause();
-    };
-    window.addEventListener('keydown', (event) => setKey(event, true), { passive: false });
-    window.addEventListener('keyup', (event) => setKey(event, false), { passive: false });
-    canvas.addEventListener('pointermove', (event) => this.updatePointer(event));
+    addEventListener('keydown', (event) => {
+      if (['KeyA', 'ArrowLeft'].includes(event.code)) this.left = true;
+      if (['KeyD', 'ArrowRight'].includes(event.code)) this.right = true;
+      if (['Space', 'KeyW', 'ArrowUp'].includes(event.code)) {
+        event.preventDefault();
+        if (!event.repeat) jump();
+      }
+      if (!event.repeat && event.code === 'KeyR') restart();
+      if (!event.repeat && (event.code === 'Escape' || event.code === 'KeyP')) pause();
+    }, { passive: false });
+    addEventListener('keyup', (event) => {
+      if (['KeyA', 'ArrowLeft'].includes(event.code)) this.left = false;
+      if (['KeyD', 'ArrowRight'].includes(event.code)) this.right = false;
+      if (['Space', 'KeyW', 'ArrowUp'].includes(event.code)) releaseJump();
+    });
     canvas.addEventListener('pointerdown', (event) => {
-      canvas.setPointerCapture?.(event.pointerId);
-      this.updatePointer(event);
-      if (event.pointerType === 'touch' && event.clientX > innerWidth * 0.72) {
-        this.touchBoost = true;
-        this.boost = true;
-      }
+      if (event.pointerType === 'mouse') jump();
     });
-    canvas.addEventListener('pointerup', (event) => {
-      if (event.pointerType === 'touch' && this.touchBoost) {
-        this.touchBoost = false;
-        this.boost = false;
-      }
-    });
-  }
-
-  updatePointer(event) {
-    const rect = this.canvas.getBoundingClientRect();
-    const x = event.clientX - rect.left - rect.width * 0.5;
-    const y = (event.clientY - rect.top - rect.height * 0.5) / 0.68;
-    if (Math.hypot(x, y) < 20) return;
-    this.pointerAngle = Math.atan2(y, x);
-    this.pointerActive = true;
-  }
-
-  reset() {
-    this.left = false;
-    this.right = false;
-    this.boost = false;
-    this.brake = false;
-    this.pointerActive = false;
-    this.pointerAngle = -Math.PI / 2;
+    canvas.addEventListener('pointerup', releaseJump);
   }
 }
 
-function toCamel(value) {
+function bindHold(element, callback) {
+  element.addEventListener('pointerdown', (event) => { event.preventDefault(); callback(true); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((name) => element.addEventListener(name, () => callback(false)));
+}
+
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const rest = Math.floor(seconds % 60);
+  const hundredths = Math.floor(seconds % 1 * 100);
+  return String(minutes).padStart(2, '0') + ':' + String(rest).padStart(2, '0') + '.' + String(hundredths).padStart(2, '0');
+}
+
+function camel(value) {
   return value.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
