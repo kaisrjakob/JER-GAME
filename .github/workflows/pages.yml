@@ -23,7 +23,7 @@ jobs:
           node-version: 22
       - name: Validate game
         run: |
-          npm test
+          npm run test:ci
           npm run check
       - uses: actions/configure-pages@v4
         with:
