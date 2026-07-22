@@ -1,0 +1,82 @@
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let stack = [];
+let current;
+let gameRunning = false;
+let score = 0;
+
+const pieceHeight = 60;
+const maxSpeed = 8;
+let speed = 4;
+let direction = 1;
+
+function randomColor(){return '#bbb';}
+
+function startGame() {
+  stack = [{x:canvas.width/2-150,y:canvas.height - pieceHeight,width:300,color:randomColor()}];
+  score = 0;
+  speed = 4;
+  gameRunning = true;
+  spawnPiece();
+  animate();
+}
+
+function spawnPiece(){
+  const w = stack[stack.length-1].width;
+  current = {x:0,y:stack[stack.length-1].y - pieceHeight,width:w,color:randomColor()};
+}
+
+function placePiece(){
+  const last = stack[stack.length-1];
+  const overlap = last.width - Math.abs(current.x - last.x);
+  if(overlap > 0){
+    const newWidth = overlap;
+    const offset = current.x - last.x;
+    current.x = last.x + offset/2;
+    current.width = newWidth;
+    stack.push(current);
+    score++;
+    speed = Math.min(maxSpeed,speed+0.2);
+    spawnPiece();
+  } else {
+    endGame();
+  }
+}
+
+function animate(){
+  if(!gameRunning) return;
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  current.x += speed*direction;
+  if(current.x + current.width > canvas.width || current.x < 0) direction *= -1;
+  [...stack, current].forEach(b=>{
+    ctx.fillStyle = b.color;
+    ctx.fillRect(b.x,b.y,b.width,pieceHeight);
+  });
+  ctx.fillStyle = '#000';
+  ctx.font = '30px Arial';
+  ctx.fillText('Score: '+score,20,40);
+  requestAnimationFrame(animate);
+}
+
+function endGame(){
+  gameRunning=false;
+  document.getElementById('game-over').style.display='flex';
+  document.getElementById('final-score').textContent='Your Score: '+score;
+}
+
+document.getElementById('start-btn').addEventListener('click',()=>{
+  document.getElementById('start-screen').style.display='none';
+  startGame();
+});
+
+document.getElementById('restart-btn').addEventListener('click',()=>{
+  document.getElementById('game-over').style.display='none';
+  startGame();
+});
+
+window.addEventListener('click',()=>{
+  if(gameRunning) placePiece();
+});
