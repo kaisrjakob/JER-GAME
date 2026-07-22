@@ -1,7 +1,7 @@
 export const VIEW_WIDTH = 1600;
 export const VIEW_HEIGHT = 900;
-export const PLAYER_WIDTH = 80;
-export const PLAYER_HEIGHT = 120;
+export const PLAYER_WIDTH = 60;
+export const PLAYER_HEIGHT = 90;
 export const LEVEL_END = 12000;
 export const GRAVITY = 2050;
 export const JUMP_SPEED = 850;
