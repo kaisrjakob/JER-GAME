@@ -1,0 +1,118 @@
+export class AudioEngine {
+  constructor(settings) {
+    this.settings = settings;
+    this.context = null;
+    this.master = null;
+    this.musicGain = null;
+    this.sfxGain = null;
+    this.timer = null;
+    this.beat = 0;
+    this.intensity = 0;
+  }
+
+  async ensure() {
+    if (!this.context) {
+      const Context = window.AudioContext || window.webkitAudioContext;
+      if (!Context) return;
+      this.context = new Context();
+      this.master = this.context.createGain();
+      this.musicGain = this.context.createGain();
+      this.sfxGain = this.context.createGain();
+      this.musicGain.connect(this.master);
+      this.sfxGain.connect(this.master);
+      this.master.connect(this.context.destination);
+      this.applySettings();
+    }
+    if (this.context.state === 'suspended') await this.context.resume();
+  }
+
+  applySettings() {
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    this.master.gain.setTargetAtTime(this.settings.muted ? 0 : 0.72, now, 0.02);
+    this.musicGain.gain.setTargetAtTime(this.settings.music, now, 0.02);
+    this.sfxGain.gain.setTargetAtTime(this.settings.sfx, now, 0.02);
+  }
+
+  async start() {
+    await this.ensure();
+    if (!this.context || this.timer) return;
+    this.beat = 0;
+    this.timer = window.setInterval(() => this.musicTick(), 145);
+  }
+
+  stop() {
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+  }
+
+  setIntensity(value) {
+    this.intensity = Math.max(0, Math.min(1, value));
+  }
+
+  toggleMute() {
+    this.settings.muted = !this.settings.muted;
+    this.applySettings();
+    return this.settings.muted;
+  }
+
+  musicTick() {
+    if (!this.context || this.context.state !== 'running') return;
+    const step = this.beat++;
+    if (step % 4 === 0) this.tone(48 + (step % 16 === 12 ? 7 : 0), 0.13, 0.16, 'sine', this.musicGain);
+    if (step % 2 === 0) this.noise(0.035, 0.028 + this.intensity * 0.018, this.musicGain);
+    if (this.intensity > 0.32 && step % 4 === 2) this.tone(96, 0.055, 0.045, 'square', this.musicGain);
+    if (this.intensity > 0.68 && step % 2 === 1) this.tone(360 + (step % 8) * 24, 0.035, 0.018, 'triangle', this.musicGain);
+  }
+
+  sfx(name) {
+    if (!this.context || this.settings.muted) return;
+    if (name === 'gate') {
+      this.tone(520, 0.1, 0.12, 'sine', this.sfxGain);
+      this.tone(780, 0.16, 0.07, 'triangle', this.sfxGain, 0.055);
+    } else if (name === 'charge') {
+      this.tone(260, 0.08, 0.12, 'sawtooth', this.sfxGain);
+      this.tone(620, 0.22, 0.08, 'sine', this.sfxGain, 0.06);
+    } else if (name === 'near') {
+      this.noise(0.1, 0.08, this.sfxGain);
+    } else if (name === 'hit') {
+      this.noise(0.28, 0.22, this.sfxGain);
+      this.tone(62, 0.3, 0.24, 'sawtooth', this.sfxGain);
+    } else if (name === 'world') {
+      [180, 270, 405].forEach((frequency, index) => this.tone(frequency, 0.24, 0.08, 'triangle', this.sfxGain, index * 0.1));
+    }
+  }
+
+  tone(frequency, duration, level, type, destination, delay = 0) {
+    const start = this.context.currentTime + delay;
+    const oscillator = this.context.createOscillator();
+    const gain = this.context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(level, start + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+    oscillator.connect(gain);
+    gain.connect(destination);
+    oscillator.start(start);
+    oscillator.stop(start + duration + 0.02);
+  }
+
+  noise(duration, level, destination) {
+    const length = Math.max(1, Math.floor(this.context.sampleRate * duration));
+    const buffer = this.context.createBuffer(1, length, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+    const source = this.context.createBufferSource();
+    const gain = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 850;
+    gain.gain.value = level;
+    source.buffer = buffer;
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(destination);
+    source.start();
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "jeremias-draught-rider",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-isolation=none",
+    "check": "node --check game.js && node --check src/audio.js && node --check src/config.js && node --check src/game.js && node --check src/renderer.js && node --check src/storage.js && node --check src/track.js && node scripts/check-assets.mjs"
+  }
+}

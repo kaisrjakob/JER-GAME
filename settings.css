@@ -1,0 +1,26 @@
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+.setting-row span { display: grid; gap: 4px; }
+.setting-row b { font: 700 14px 'Barlow Condensed', sans-serif; letter-spacing: .12em; }
+.setting-row small { color: #8196aa; font-size: 10px; }
+.setting-row input[type=range] { width: 155px; accent-color: var(--orange); }
+.setting-row input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--orange); }
+.setting-row select {
+  min-width: 155px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  background: #07182d;
+  color: #fff;
+  font: 600 11px 'Barlow Condensed', sans-serif;
+  letter-spacing: .08em;
+}
+@media (max-width: 520px) {
+  .setting-row { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .setting-row input[type=range], .setting-row select { width: 100%; }
+}
