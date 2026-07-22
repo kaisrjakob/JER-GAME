@@ -68,6 +68,7 @@ export class UnfairRenderer {
     this.drawBands(state, time);
     this.drawTraps(state, time);
     this.drawFinish(state, time);
+    this.drawFinaleCaps(state);
     this.drawParticles(state);
     this.drawPlayer(state, time);
     this.drawVignette();
@@ -141,9 +142,15 @@ export class UnfairRenderer {
         ctx.fillRect(clampX + 3, y - 22, 3, 32);
         ctx.fillStyle = '#344e63';
       }
-      ctx.fillStyle = 'rgba(181,214,234,.25)';
-      ctx.font = '700 15px "Barlow Condensed",sans-serif';
-      ctx.fillText(section.title + ' // JEREMIAS', x + 28, y + 43);
+      if (platform.width >= 220) {
+        ctx.fillStyle = 'rgba(181,214,234,.25)';
+        ctx.font = '700 15px "Barlow Condensed",sans-serif';
+        ctx.fillText(section.title + ' // JEREMIAS', x + 28, y + 43);
+      }
+      if (platform.phantom) {
+        ctx.fillStyle = 'rgba(96,52,24,.16)';
+        ctx.fillRect(x, y - 14, platform.width, 8);
+      }
       if (platform.moving) {
         ctx.strokeStyle = '#ff8624';
         ctx.setLineDash([8, 8]);
@@ -207,7 +214,9 @@ export class UnfairRenderer {
       if (trap.type === 'spikes') this.drawSpikes(trap, state);
       else if (trap.type === 'fallingPipe') this.drawFallingPipe(trap, state);
       else if (trap.type === 'swingCap') this.drawSwingCap(trap, state);
-      else this.drawPressure(trap, state, time);
+      else if (trap.type === 'ghostBlock') this.drawGhostBlock(trap, state);
+      else if (trap.type === 'fakeCheckpoint') this.drawFakeCheckpoint(trap, state, time);
+      else if (trap.type === 'pressure') this.drawPressure(trap, state, time);
     }
     const ctx = this.ctx;
     const fakeX = this.worldX(6070, state);
@@ -278,6 +287,79 @@ export class UnfairRenderer {
     if (trap.phase === 'idle') {
       ctx.fillStyle = '#486175';
       ctx.fillRect(x + 34, trap.y + trap.height - 2, 24, 18);
+    }
+  }
+
+  drawGhostBlock(trap, state) {
+    if (!trap.revealed) return;
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -120 || x > VIEW_WIDTH + 120) return;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.55)';
+    ctx.shadowBlur = 9;
+    ctx.drawImage(this.dwPipe, x - 4, trap.y - 4, trap.width + 8, trap.height + 8);
+    ctx.restore();
+    ctx.strokeStyle = 'rgba(159,184,200,.7)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, trap.y, trap.width, trap.height);
+  }
+
+  drawFakeCheckpoint(trap, state, time) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -150 || x > VIEW_WIDTH + 150) return;
+    const baseY = trap.y;
+    ctx.strokeStyle = trap.exposed ? '#e6483d' : '#0d83d5';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x, baseY - 180);
+    ctx.stroke();
+    ctx.fillStyle = trap.exposed ? '#a3271e' : '#0065ad';
+    ctx.beginPath();
+    ctx.moveTo(x, baseY - 180);
+    ctx.lineTo(x + 125, baseY - 153 + Math.sin(time * .004) * 4);
+    ctx.lineTo(x, baseY - 116);
+    ctx.closePath();
+    ctx.fill();
+    if (trap.exposed) {
+      ctx.strokeStyle = '#ffd9d5';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(x + 24, baseY - 168);
+      ctx.lineTo(x + 66, baseY - 128);
+      ctx.moveTo(x + 66, baseY - 168);
+      ctx.lineTo(x + 24, baseY - 128);
+      ctx.stroke();
+    } else if (this.logo) {
+      ctx.drawImage(this.logo, x + 13, baseY - 166, 91, 23);
+    }
+    ctx.fillStyle = '#d8e8f2';
+    ctx.font = '700 12px "Barlow Condensed",sans-serif';
+    ctx.fillText(trap.exposed ? 'NICHT ZERTIFIZIERT' : 'SERVICEPUNKT', x + 12, baseY - 196);
+  }
+
+  drawFinaleCaps(state) {
+    const ctx = this.ctx;
+    for (const trap of state.level.traps) {
+      if (trap.type !== 'finaleCap') continue;
+      const x = this.worldX(trap.x, state);
+      if (x < -260 || x > VIEW_WIDTH + 260) continue;
+      ctx.save();
+      if (trap.phase === 'toppled') {
+        ctx.translate(x + trap.width + 46, trap.floorY - 34);
+        ctx.rotate(1.35);
+        ctx.globalAlpha = .9;
+        ctx.drawImage(this.rainCap, -trap.width / 2, -trap.height / 2, trap.width, trap.height);
+      } else {
+        ctx.translate(x + trap.width / 2, trap.y + trap.height / 2);
+        ctx.rotate(trap.angle);
+        ctx.shadowColor = 'rgba(0,0,0,.6)';
+        ctx.shadowBlur = 14;
+        ctx.drawImage(this.rainCap, -trap.width / 2, -trap.height / 2, trap.width, trap.height);
+      }
+      ctx.restore();
     }
   }
 

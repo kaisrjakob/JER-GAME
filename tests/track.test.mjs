@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GRAVITY, JUMP_SPEED, LEVEL_END, PLAYER_WIDTH, RUN_SPEED, SECTIONS,
+  GRAVITY, JUMP_SPEED, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, RUN_SPEED, SECTIONS,
   calculateScore, formatScore, sectionIndexForX
 } from '../src/config.js';
 import { activeTrapBox, createLevel, overlaps } from '../src/track.js';
@@ -96,6 +96,87 @@ test('every launched chimney cap is jumpable and eventually leaves the route', (
   }
 });
 
+test('every launched chimney cap can be baited from safe ground before its spike field', () => {
+  const level = createLevel();
+  const caps = level.traps.filter((trap) => trap.type === 'swingCap');
+  for (const cap of caps) {
+    const spikesBetween = level.traps.filter((trap) =>
+      trap.type === 'spikes' && trap.section === cap.section &&
+      trap.x + trap.width > cap.triggerX && trap.x < cap.baseX);
+    for (const spike of spikesBetween) {
+      assert.ok(cap.triggerX + PLAYER_WIDTH + 10 < spike.x,
+        `${cap.id} arms while the player is forced over spike field ${spike.id}`);
+    }
+    const reaction = 0.16 + (cap.baseX - (cap.triggerX + PLAYER_WIDTH)) / Math.abs(cap.vx);
+    assert.ok(reaction >= 0.6, `${cap.id} gives only ${reaction.toFixed(2)}s to react`);
+  }
+});
+
+test('every invisible DW element leaves a low-hop route across its gap', () => {
+  const level = createLevel();
+  const blocks = level.traps.filter((trap) => trap.type === 'ghostBlock');
+  assert.ok(blocks.length > 0);
+  const jumpRise = JUMP_SPEED ** 2 / (2 * GRAVITY);
+  for (const block of blocks) {
+    const takeoff = level.platforms
+      .filter((platform) => !platform.phantom && platform.x + platform.width <= block.x)
+      .sort((a, b) => b.x + b.width - (a.x + a.width))[0];
+    const landing = level.platforms
+      .filter((platform) => !platform.phantom && platform.x >= block.x + block.width)
+      .sort((a, b) => a.x - b.x)[0];
+    assert.ok(takeoff && landing, `${block.id} does not span a platform gap`);
+    const requiredRise = Math.max(20, takeoff.y - landing.y + 10);
+    assert.ok(requiredRise < jumpRise, `${block.id} gap needs more rise than the jump allows`);
+    const headAtRequiredRise = takeoff.y - PLAYER_HEIGHT - requiredRise;
+    assert.ok(headAtRequiredRise > block.y + block.height, `${block.id} blocks even the minimal hop`);
+    assert.ok(takeoff.y - PLAYER_HEIGHT - jumpRise < block.y + block.height,
+      `${block.id} never intersects a full jump — the troll is disarmed`);
+  }
+});
+
+test('the counterfeit service point can be cleared with a full jump', () => {
+  const level = createLevel();
+  const fakes = level.traps.filter((trap) => trap.type === 'fakeCheckpoint');
+  assert.ok(fakes.length > 0);
+  const jumpRise = JUMP_SPEED ** 2 / (2 * GRAVITY);
+  for (const fake of fakes) {
+    const box = activeTrapBox(fake);
+    assert.ok(box, `${fake.id} must always be armed`);
+    assert.ok(box.height < jumpRise - 10, `${fake.id} pole hitbox is too tall to jump`);
+  }
+});
+
+test('phantom sheet metal hides a gap that stays jumpable and carries no checkpoint', () => {
+  const level = createLevel();
+  const phantoms = level.platforms.filter((platform) => platform.phantom);
+  assert.ok(phantoms.length > 0);
+  for (const phantom of phantoms) {
+    for (const checkpoint of level.checkpoints) {
+      assert.ok(checkpoint.x < phantom.x || checkpoint.x >= phantom.x + phantom.width,
+        `${checkpoint.id} would respawn the player on phantom ground`);
+    }
+  }
+});
+
+test('the finale cap guards the finish line and eventually clears the way', () => {
+  const level = createLevel();
+  const finale = level.traps.find((trap) => trap.type === 'finaleCap');
+  assert.ok(finale);
+  const jumpRise = JUMP_SPEED ** 2 / (2 * GRAVITY);
+  assert.ok(finale.height < jumpRise - 10, 'resting cap must stay jumpable in principle');
+  const winLine = level.finish.x + 105;
+  assert.ok(finale.x < winLine && winLine < finale.x + finale.width, 'cap must land on the finish line');
+  assert.ok(finale.triggerX < finale.x - PLAYER_WIDTH, 'cap needs warning distance before its landing zone');
+  assert.equal(activeTrapBox(finale), null);
+  finale.phase = 'falling';
+  assert.ok(activeTrapBox(finale));
+  finale.phase = 'resting';
+  assert.ok(activeTrapBox(finale));
+  finale.phase = 'toppled';
+  finale.cleared = true;
+  assert.equal(activeTrapBox(finale), null);
+});
+
 test('collectibles include realistic movement patterns with a bounded runaway band', () => {
   const bands = createLevel().bands;
   assert.ok(bands.some((band) => band.motion === 'railX'));
@@ -105,7 +186,7 @@ test('collectibles include realistic movement patterns with a bounded runaway ba
 });
 
 test('every gap between consecutive platforms is reachable', () => {
-  const platforms = createLevel().platforms;
+  const platforms = createLevel().platforms.filter((platform) => !platform.phantom);
   for (let index = 1; index < platforms.length; index += 1) {
     const previous = platforms[index - 1];
     const next = platforms[index];
