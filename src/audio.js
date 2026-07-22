@@ -8,6 +8,7 @@ export class AudioEngine {
     this.timer = null;
     this.beat = 0;
     this.intensity = 0;
+    this.bgMusic = null;
   }
 
   async ensure() {
@@ -23,6 +24,9 @@ export class AudioEngine {
       this.master.connect(this.context.destination);
       this.applySettings();
     }
+    if (!this.bgMusic) {
+      this.bgMusic = document.getElementById('bg-music');
+    }
     if (this.context.state === 'suspended') await this.context.resume();
   }
 
@@ -32,6 +36,9 @@ export class AudioEngine {
     this.master.gain.setTargetAtTime(this.settings.muted ? 0 : 0.72, now, 0.02);
     this.musicGain.gain.setTargetAtTime(this.settings.music, now, 0.02);
     this.sfxGain.gain.setTargetAtTime(this.settings.sfx, now, 0.02);
+    if (this.bgMusic) {
+      this.bgMusic.volume = this.settings.muted ? 0 : this.settings.music * 0.5;
+    }
   }
 
   async start() {
@@ -39,11 +46,20 @@ export class AudioEngine {
     if (!this.context || this.timer) return;
     this.beat = 0;
     this.timer = window.setInterval(() => this.musicTick(), 145);
+    if (this.bgMusic && this.bgMusic.paused) {
+      this.bgMusic.play().catch(() => {
+        // Fallback if autoplay fails
+      });
+    }
   }
 
   stop() {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    if (this.bgMusic) {
+      this.bgMusic.pause();
+      this.bgMusic.currentTime = 0;
+    }
   }
 
   setIntensity(value) {
