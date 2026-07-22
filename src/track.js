@@ -12,7 +12,14 @@ export function createLevel() {
       platform('industry-collapse', 5480, 550, 330, 2, { collapsible: true, collapseDelay: 1.15 }),
       platform('rost-blech', 5810, 670, 130, 2, { phantom: true }),
       platform('industry-2', 5940, 670, 500, 2),
-      platform('finish-roof', 6590, 620, 980, 2)
+      platform('finish-roof', 6590, 620, 980, 2),
+      platform('storm-0', 7690, 660, 620, 3, { ice: true }),
+      platform('storm-1', 8390, 640, 700, 3),
+      platform('storm-2', 9170, 600, 560, 3, { ice: true }),
+      platform('pruef-0', 9810, 660, 640, 4),
+      platform('pruef-rost', 10530, 660, 120, 4, { phantom: true }),
+      platform('pruef-2', 10650, 660, 800, 4),
+      platform('finale-roof', 11530, 620, 1250, 4)
     ],
     traps: [
       spikeTrap('clamp-spikes-1', 610, 810, 700, 120, 0),
@@ -29,12 +36,25 @@ export function createLevel() {
       pressureTrap('industrial-blast', 5200, 5350, 500, 2),
       spikeTrap('fake-finish', 5970, 6240, 670, 135, 2),
       fallingPipe('last-pipe', 6660, 6860, 110, 620, 92, 110, 2),
-      finaleCap('finale-cap', 7020, 7150, 60, 620, 140, 100, 2)
+      windZone('gust-1', 8350, 780, -1, 235, 3.4, 1.4, 0, 3),
+      spikeTrap('gust-spikes', 8480, 8760, 640, 120, 3),
+      dripper('kondensat-1', 9300, 300, 600, 1.6, 0, 3),
+      dripper('kondensat-2', 9520, 280, 600, 1.6, 0.8, 3),
+      sootZone('russnebel', 10050, 770, 4),
+      steamVent('dampf-1', 10740, 660, 2.4, 0.9, 0, 4),
+      fan('abluft-fan', 10900, 550, 85, 1.2, 4),
+      mimicBand('fake-band', 11080, 515, 4),
+      crusher('presse-1', 11150, 660, 2.2, 0, 4),
+      crusher('presse-2', 11700, 620, 2.2, 1.1, 4),
+      finaleCap('finale-cap', 11820, 11950, 60, 620, 140, 100, 4)
     ],
     checkpoints: [
       { id: 'cp-dw', x: 2280, y: 680, label: 'JEREMIAS SERVICEPUNKT 01', active: false },
       { id: 'cp-vision', x: 4430, y: 690, label: 'JEREMIAS SERVICEPUNKT 02', active: false },
-      { id: 'cp-industry', x: 6110, y: 670, label: 'JEREMIAS SERVICEPUNKT 03', active: false }
+      { id: 'cp-industry', x: 6110, y: 670, label: 'JEREMIAS SERVICEPUNKT 03', active: false },
+      { id: 'cp-storm', x: 7760, y: 660, label: 'JEREMIAS SERVICEPUNKT 04', active: false },
+      { id: 'cp-pruefstand', x: 9900, y: 660, label: 'JEREMIAS SERVICEPUNKT 05', active: false },
+      { id: 'cp-finale', x: 11560, y: 620, label: 'JEREMIAS SERVICEPUNKT 06', active: false }
     ],
     bands: [
       band(380, 610), band(1280, 540, { motion: 'railX', amplitude: 58, speed: 1.5 }),
@@ -43,9 +63,11 @@ export function createLevel() {
       band(4220, 555), band(5000, 505),
       band(5600, 410, { motion: 'flee', triggerX: 5420, travel: 135 }),
       band(6030, 535), band(6740, 485, { motion: 'railX', amplitude: 65, speed: 2.1 }),
-      band(7020, 475)
+      band(7020, 475),
+      band(7900, 530), band(8650, 480, { motion: 'railY', amplitude: 40, speed: 1.7 }),
+      band(9420, 460), band(10770, 380), band(11380, 540), band(11930, 460)
     ],
-    finish: { x: 7140, y: 620 }
+    finish: { x: 11940, y: 620 }
   };
 }
 
@@ -97,6 +119,56 @@ function finaleCap(id, triggerX, x, startY, floorY, width, height, section) {
   };
 }
 
+function windZone(id, x, width, direction, strength, period, onTime, offset, section) {
+  return {
+    id, type: 'windZone', triggerX: -Infinity, x, y: 0, width, height: 0,
+    direction, strength, period, onTime, offset, section, triggered: false, active: false, announced: false
+  };
+}
+
+function dripper(id, x, outletY, floorY, period, offset, section) {
+  return {
+    id, type: 'dripper', triggerX: -Infinity, x, y: outletY, outletY, floorY, width: 26, height: 34,
+    period, offset, section, triggered: false, dropY: outletY, dropActive: false
+  };
+}
+
+function fan(id, x, cy, radius, speed, section) {
+  return {
+    id, type: 'fan', triggerX: -Infinity, x, y: cy - radius, cy, radius, width: 36, height: radius * 2,
+    thickness: 36, speed, angle: 0, section, triggered: false
+  };
+}
+
+function steamVent(id, x, floorY, period, onTime, offset, section) {
+  return {
+    id, type: 'steamVent', triggerX: -Infinity, x, y: floorY, floorY, width: 60, height: 0,
+    jetHeight: 180, period, onTime, offset, section, triggered: false, active: false
+  };
+}
+
+function sootZone(id, x, width, section) {
+  return {
+    id, type: 'sootZone', triggerX: -Infinity, x, y: 0, width, height: 0,
+    section, triggered: false, announced: false
+  };
+}
+
+function crusher(id, x, floorY, period, offset, section) {
+  return {
+    id, type: 'crusher', triggerX: -Infinity, x, y: floorY - 160, floorY, width: 130, height: 60,
+    plateHeight: 60, raisedY: floorY - 160, period, offset, section, triggered: false,
+    plateY: floorY - 160, slammed: false
+  };
+}
+
+function mimicBand(id, x, y, section) {
+  return {
+    id, type: 'mimicBand', triggerX: Infinity, x, y, width: 36, height: 34,
+    section, triggered: false, sprung: false
+  };
+}
+
 function band(x, y, extras = {}) {
   return { x, y, baseX: x, baseY: y, collected: false, motion: 'float', activated: false, ...extras };
 }
@@ -120,6 +192,18 @@ export function activeTrapBox(trap) {
   }
   if (trap.type === 'finaleCap' && ['falling', 'resting'].includes(trap.phase) && !trap.cleared) {
     return { x: trap.x + 10, y: trap.y + 8, width: trap.width - 20, height: trap.height - 12 };
+  }
+  if (trap.type === 'dripper' && trap.dropActive) {
+    return { x: trap.x + 2, y: trap.dropY, width: 22, height: 34 };
+  }
+  if (trap.type === 'fan' && Math.abs(Math.sin(trap.angle)) > 0.45) {
+    return { x: trap.x, y: trap.cy - trap.radius, width: trap.thickness, height: trap.radius * 2 };
+  }
+  if (trap.type === 'crusher') {
+    return { x: trap.x, y: trap.plateY, width: trap.width, height: trap.plateHeight };
+  }
+  if (trap.type === 'mimicBand' && !trap.sprung) {
+    return { x: trap.x - 18, y: trap.y - 16, width: 36, height: 34 };
   }
   return null;
 }

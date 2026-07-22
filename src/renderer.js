@@ -37,11 +37,12 @@ export class UnfairRenderer {
       image.onerror = reject;
       image.src = source;
     })));
-    this.images = images.slice(0, 3);
-    this.logo = images[3];
-    this.clampBand = images[4];
-    this.dwPipe = images[5];
-    this.rainCap = images[6];
+    const sectionCount = SECTIONS.length;
+    this.images = images.slice(0, sectionCount);
+    this.logo = images[sectionCount];
+    this.clampBand = images[sectionCount + 1];
+    this.dwPipe = images[sectionCount + 2];
+    this.rainCap = images[sectionCount + 3];
   }
 
   resize() {
@@ -71,6 +72,7 @@ export class UnfairRenderer {
     this.drawFinaleCaps(state);
     this.drawParticles(state);
     this.drawPlayer(state, time);
+    this.drawSoot(state);
     this.drawVignette();
   }
 
@@ -83,6 +85,10 @@ export class UnfairRenderer {
     const height = image.height * scale;
     const parallax = this.settings.reducedMotion ? 0 : -(state.cameraX * 0.025) % 100;
     ctx.drawImage(image, (this.width - width) / 2 + parallax, (this.height - height) / 2, width, height);
+    if (SECTIONS[index].tint) {
+      ctx.fillStyle = SECTIONS[index].tint;
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
     const gradient = ctx.createLinearGradient(0, 0, 0, this.height);
     gradient.addColorStop(0, 'rgba(1,8,20,.48)');
     gradient.addColorStop(.48, 'rgba(3,16,34,.73)');
@@ -151,6 +157,14 @@ export class UnfairRenderer {
         ctx.fillStyle = 'rgba(96,52,24,.16)';
         ctx.fillRect(x, y - 14, platform.width, 8);
       }
+      if (platform.ice) {
+        ctx.fillStyle = 'rgba(196,232,252,.55)';
+        ctx.fillRect(x, y - 20, platform.width, 10);
+        ctx.fillStyle = 'rgba(255,255,255,.75)';
+        for (let shineX = x + 30; shineX < x + platform.width - 40; shineX += 120) {
+          ctx.fillRect(shineX, y - 18, 44, 3);
+        }
+      }
       if (platform.moving) {
         ctx.strokeStyle = '#ff8624';
         ctx.setLineDash([8, 8]);
@@ -217,6 +231,12 @@ export class UnfairRenderer {
       else if (trap.type === 'ghostBlock') this.drawGhostBlock(trap, state);
       else if (trap.type === 'fakeCheckpoint') this.drawFakeCheckpoint(trap, state, time);
       else if (trap.type === 'pressure') this.drawPressure(trap, state, time);
+      else if (trap.type === 'windZone') this.drawWindZone(trap, state, time);
+      else if (trap.type === 'dripper') this.drawDripper(trap, state, time);
+      else if (trap.type === 'fan') this.drawFan(trap, state);
+      else if (trap.type === 'steamVent') this.drawSteamVent(trap, state, time);
+      else if (trap.type === 'crusher') this.drawCrusher(trap, state);
+      else if (trap.type === 'mimicBand') this.drawMimicBand(trap, state, time);
     }
     const ctx = this.ctx;
     const fakeX = this.worldX(6070, state);
@@ -389,6 +409,185 @@ export class UnfairRenderer {
       ctx.closePath();
       ctx.fill();
     }
+  }
+
+  drawWindZone(trap, state, time) {
+    if (!trap.active) return;
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x + trap.width < -100 || x > VIEW_WIDTH + 100) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(190,224,248,.5)';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    const drift = this.settings.reducedMotion ? 0 : (time * .45) % 90;
+    for (let row = 0; row < 5; row += 1) {
+      const streakY = 300 + row * 78 + Math.sin(time * .002 + row * 2) * 14;
+      for (let streakX = x + trap.width; streakX > x - 90; streakX -= 130) {
+        const sx = streakX - drift * -trap.direction;
+        ctx.globalAlpha = .28 + row % 2 * .18;
+        ctx.beginPath();
+        ctx.moveTo(sx, streakY);
+        ctx.lineTo(sx + trap.direction * 68, streakY + 5);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
+  drawDripper(trap, state, time) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -100 || x > VIEW_WIDTH + 100) return;
+    ctx.fillStyle = '#42586a';
+    ctx.fillRect(x - 8, trap.outletY - 46, trap.width + 16, 46);
+    ctx.fillStyle = '#243a4c';
+    ctx.fillRect(x - 2, trap.outletY - 12, trap.width + 4, 12);
+    ctx.fillStyle = 'rgba(143,224,138,.85)';
+    ctx.beginPath();
+    ctx.ellipse(x + 13, trap.outletY + 2, 8, 5 + Math.sin(time * .01) * 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    if (trap.dropActive) {
+      ctx.fillStyle = '#8fe08a';
+      ctx.shadowColor = '#8fe08a';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.ellipse(x + 13, trap.dropY + 17, 9, 17, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+    ctx.fillStyle = 'rgba(120,200,120,.3)';
+    ctx.beginPath();
+    ctx.ellipse(x + 13, trap.floorY, 26, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawFan(trap, state) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -200 || x > VIEW_WIDTH + 200) return;
+    const cx = x + trap.thickness / 2;
+    ctx.fillStyle = '#17364e';
+    ctx.fillRect(x - 14, trap.cy - trap.radius - 26, trap.thickness + 28, 26);
+    ctx.fillStyle = '#ff7a1a';
+    for (let stripe = x - 10; stripe < x + trap.thickness + 12; stripe += 18) {
+      ctx.fillRect(stripe, trap.cy - trap.radius - 18, 9, 5);
+    }
+    ctx.save();
+    ctx.translate(cx, trap.cy);
+    ctx.rotate(0);
+    ctx.strokeStyle = '#b7cdd9';
+    ctx.lineWidth = 11;
+    ctx.lineCap = 'round';
+    for (let blade = 0; blade < 4; blade += 1) {
+      const angle = trap.angle + blade * Math.PI / 2;
+      ctx.globalAlpha = .95;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(angle) * 8, Math.sin(angle) * trap.radius);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#0d83d5';
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#cfdce3';
+    ctx.font = '700 11px "Barlow Condensed",sans-serif';
+    ctx.fillText('ABLUFT', x - 6, trap.cy - trap.radius - 34);
+  }
+
+  drawSteamVent(trap, state, time) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -150 || x > VIEW_WIDTH + 150) return;
+    ctx.fillStyle = '#42586a';
+    ctx.fillRect(x - 6, trap.floorY - 16, trap.width + 12, 16);
+    ctx.fillStyle = '#ff7a1a';
+    ctx.fillRect(x, trap.floorY - 12, trap.width, 4);
+    if (trap.active) {
+      const jet = ctx.createLinearGradient(0, trap.floorY, 0, trap.floorY - trap.jetHeight);
+      jet.addColorStop(0, 'rgba(226,242,250,.85)');
+      jet.addColorStop(1, 'rgba(226,242,250,0)');
+      ctx.fillStyle = jet;
+      const wobble = this.settings.reducedMotion ? 0 : Math.sin(time * .02) * 6;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, trap.floorY - 12);
+      ctx.lineTo(x - 10 + wobble, trap.floorY - trap.jetHeight);
+      ctx.lineTo(x + trap.width + 10 + wobble, trap.floorY - trap.jetHeight);
+      ctx.lineTo(x + trap.width - 4, trap.floorY - 12);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.fillStyle = '#cfdce3';
+    ctx.font = '700 11px "Barlow Condensed",sans-serif';
+    ctx.fillText('DAMPF', x + 8, trap.floorY + 20);
+  }
+
+  drawCrusher(trap, state) {
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -220 || x > VIEW_WIDTH + 220) return;
+    ctx.fillStyle = '#17364e';
+    ctx.fillRect(x - 20, trap.raisedY - 60, 16, trap.floorY - trap.raisedY + 60);
+    ctx.fillRect(x + trap.width + 4, trap.raisedY - 60, 16, trap.floorY - trap.raisedY + 60);
+    ctx.fillRect(x - 20, trap.raisedY - 76, trap.width + 40, 24);
+    ctx.fillStyle = '#5c7487';
+    ctx.fillRect(x + trap.width / 2 - 9, trap.raisedY - 52, 18, trap.plateY - trap.raisedY + 52);
+    const plate = ctx.createLinearGradient(0, trap.plateY, 0, trap.plateY + trap.plateHeight);
+    plate.addColorStop(0, '#dce8ed');
+    plate.addColorStop(.5, '#617c90');
+    plate.addColorStop(1, '#2e465b');
+    ctx.fillStyle = plate;
+    ctx.fillRect(x, trap.plateY, trap.width, trap.plateHeight);
+    ctx.fillStyle = '#ff7a1a';
+    for (let stripe = x + 6; stripe < x + trap.width - 10; stripe += 26) {
+      ctx.fillRect(stripe, trap.plateY + trap.plateHeight - 12, 14, 6);
+    }
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 12px "Barlow Condensed",sans-serif';
+    ctx.fillText('PRÜFSTEMPEL', x + 18, trap.raisedY - 58);
+  }
+
+  drawMimicBand(trap, state, time) {
+    if (trap.sprung) return;
+    const ctx = this.ctx;
+    const x = this.worldX(trap.x, state);
+    if (x < -70 || x > VIEW_WIDTH + 70) return;
+    ctx.save();
+    ctx.translate(x, trap.y);
+    ctx.rotate(.25 + Math.sin(time * .003 + trap.x) * .08);
+    ctx.shadowColor = '#e6483d';
+    ctx.shadowBlur = 18;
+    ctx.drawImage(this.clampBand, -46, -30, 92, 60);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = 'rgba(230,72,61,.85)';
+    ctx.beginPath(); ctx.arc(0, 1, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  drawSoot(state) {
+    const zones = state.level.traps.filter((trap) => trap.type === 'sootZone');
+    if (!zones.length) return;
+    const center = state.player.x + PLAYER_WIDTH / 2;
+    let penetration = 0;
+    for (const zone of zones) {
+      if (center < zone.x - 150 || center > zone.x + zone.width + 150) continue;
+      const inLeft = Math.min(1, Math.max(0, (center - (zone.x - 150)) / 150));
+      const inRight = Math.min(1, Math.max(0, ((zone.x + zone.width + 150) - center) / 150));
+      penetration = Math.max(penetration, Math.min(inLeft, inRight));
+    }
+    if (penetration <= 0) return;
+    const ctx = this.ctx;
+    const px = this.worldX(center, state);
+    const py = state.player.y + PLAYER_HEIGHT / 2;
+    const gradient = ctx.createRadialGradient(px, py, 60, px, py, 640);
+    gradient.addColorStop(0, 'rgba(2,4,10,0)');
+    gradient.addColorStop(.35, 'rgba(2,4,10,0)');
+    gradient.addColorStop(1, 'rgba(2,4,10,' + (.93 * penetration) + ')');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(-100, -100, VIEW_WIDTH + 200, VIEW_HEIGHT + 200);
   }
 
   drawFinish(state, time) {

@@ -1,7 +1,7 @@
 import { AudioEngine } from './audio.js';
 import {
   DEATH_MESSAGES, GRAVITY, JUMP_SPEED, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH,
-  RUN_SPEED, SECTIONS, VIEW_HEIGHT, calculateScore, formatScore, sectionIndexForX
+  RUN_SPEED, SECTIONS, STEAM_BOOST, VIEW_HEIGHT, calculateScore, formatScore, sectionIndexForX
 } from './config.js';
 import { UnfairRenderer } from './renderer.js';
 import { loadHighScore, loadSettings, saveHighScore, saveSettings } from './storage.js';
@@ -119,6 +119,7 @@ export class UnfairJeremias {
       vy: 0,
       facing: 1,
       onGround: true,
+      onIce: false,
       coyote: .1,
       jumpBuffer: 0,
       invulnerable: 0
@@ -159,10 +160,10 @@ export class UnfairJeremias {
 
     const direction = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
     if (direction !== 0) {
-      player.vx += direction * 1900 * dt;
+      player.vx += direction * (player.onIce ? 620 : 1900) * dt;
       player.facing = direction;
     } else {
-      player.vx *= Math.pow(.0007, dt);
+      player.vx *= Math.pow(player.onIce ? .45 : .0007, dt);
     }
     player.vx = Math.max(-RUN_SPEED, Math.min(RUN_SPEED, player.vx));
     if (player.jumpBuffer > 0 && (player.onGround || player.coyote > 0)) {
@@ -179,6 +180,11 @@ export class UnfairJeremias {
     this.updateBands(dt);
 
     player.x += player.vx * dt;
+    for (const zone of state.level.traps) {
+      if (zone.type !== 'windZone' || !zone.active) continue;
+      const center = player.x + PLAYER_WIDTH / 2;
+      if (center >= zone.x && center <= zone.x + zone.width) player.x += zone.direction * zone.strength * dt;
+    }
     player.x = Math.max(-100, player.x);
     const previousBottom = player.y + PLAYER_HEIGHT;
     player.vy += GRAVITY * dt;
@@ -199,6 +205,11 @@ export class UnfairJeremias {
       }
     }
     this.collideGhostBlocks(previousBottom);
+    player.onIce = !!(standingPlatform && standingPlatform.ice);
+    if (standingPlatform?.ice && !standingPlatform.iceAnnounced) {
+      standingPlatform.iceAnnounced = true;
+      this.callout('VEREISTES BLECH — BREMSWEG BEACHTEN');
+    }
     if (standingPlatform?.collapsible && !standingPlatform.triggered) {
       standingPlatform.triggered = true;
       standingPlatform.timer = 0;
@@ -212,7 +223,9 @@ export class UnfairJeremias {
     if (player.y > VIEW_HEIGHT + 140) {
       const center = player.x + PLAYER_WIDTH / 2;
       const phantom = state.level.platforms.find((item) => item.phantom && center >= item.x && center <= item.x + item.width);
+      const gust = state.level.traps.find((item) => item.type === 'windZone' && item.active && center >= item.x && center <= item.x + item.width);
       if (phantom) this.kill('DURCHGEROSTETES BLECH. KEIN ORIGINAL-JEREMIAS-MATERIAL.', phantom.id);
+      else if (gust) this.kill('ABGASBÖE NICHT EINKALKULIERT.', gust.id);
       else this.kill('ABSTURZ ZWISCHEN DEN ABGASSYSTEMEN', 'absturz');
     }
     if (player.x >= state.level.finish.x + 105 && player.y < state.level.finish.y) this.win();
@@ -224,7 +237,7 @@ export class UnfairJeremias {
     }
     const targetCamera = Math.max(0, Math.min(LEVEL_END - 1100, player.x - 420));
     state.cameraX += (targetCamera - state.cameraX) * Math.min(1, dt * 4.8);
-    this.audio.setIntensity(.35 + section * .25);
+    this.audio.setIntensity(.3 + section * .15);
     this.updateHud();
   }
 
@@ -323,6 +336,75 @@ export class UnfairJeremias {
           }
         }
       }
+      if (trap.type === 'windZone') {
+        const wasActive = trap.active;
+        trap.active = (this.state.elapsed + trap.offset) % trap.period < trap.onTime;
+        const center = playerX + PLAYER_WIDTH / 2;
+        if (trap.active && !wasActive && center >= trap.x - 400 && center <= trap.x + trap.width) {
+          this.callout('ABGASBÖE — GEGENHALTEN!');
+          this.audio.sfx('near');
+        }
+      }
+      if (trap.type === 'dripper') {
+        const cycle = (this.state.elapsed + trap.offset) % trap.period;
+        const fallTime = Math.sqrt(2 * (trap.floorY - trap.outletY) / 1500);
+        if (cycle < fallTime) {
+          trap.dropActive = true;
+          trap.dropY = trap.outletY + 750 * cycle * cycle;
+        } else if (trap.dropActive) {
+          trap.dropActive = false;
+          this.renderer.emit(trap.x + 13, trap.floorY, '#8fe08a', 6);
+        }
+      }
+      if (trap.type === 'fan') trap.angle += trap.speed * dt;
+      if (trap.type === 'steamVent') {
+        trap.active = (this.state.elapsed + trap.offset) % trap.period < trap.onTime;
+        if (trap.active) {
+          const player = this.state.player;
+          const jet = { x: trap.x, y: trap.floorY - trap.jetHeight, width: trap.width, height: trap.jetHeight };
+          const playerBox = { x: player.x + 8, y: player.y + 5, width: PLAYER_WIDTH - 16, height: PLAYER_HEIGHT - 7 };
+          if (overlaps(playerBox, jet)) {
+            const boosting = player.vy > -STEAM_BOOST;
+            player.vy = Math.min(player.vy, -STEAM_BOOST);
+            if (boosting && !trap.boosting) {
+              trap.boosting = true;
+              player.onGround = false;
+              this.audio.sfx('charge');
+              this.renderer.emit(trap.x + trap.width / 2, trap.floorY - 40, '#cfe8f2', 12);
+            }
+          } else {
+            trap.boosting = false;
+          }
+        } else {
+          trap.boosting = false;
+        }
+      }
+      if (trap.type === 'sootZone' && !trap.announced) {
+        const center = playerX + PLAYER_WIDTH / 2;
+        if (center >= trap.x && center <= trap.x + trap.width) {
+          trap.announced = true;
+          this.callout('RUSSNEBEL — SICHT EINGESCHRÄNKT');
+        }
+      }
+      if (trap.type === 'crusher') {
+        const cycle = (this.state.elapsed + trap.offset) % trap.period;
+        const downY = trap.floorY - trap.plateHeight;
+        if (cycle < 1) {
+          trap.plateY = trap.raisedY;
+          trap.slammed = false;
+        } else if (cycle < 1.15) {
+          trap.plateY = trap.raisedY + (downY - trap.raisedY) * ((cycle - 1) / .15);
+        } else if (cycle < 1.6) {
+          trap.plateY = downY;
+          if (!trap.slammed) {
+            trap.slammed = true;
+            this.audio.sfx('slam');
+            this.renderer.emit(trap.x + trap.width / 2, trap.floorY, '#cfdce3', 12);
+          }
+        } else {
+          trap.plateY = downY + (trap.raisedY - downY) * ((cycle - 1.6) / (trap.period - 1.6));
+        }
+      }
       if (trap.type === 'finaleCap') {
         if (trap.phase === 'wobble') {
           trap.timer += dt;
@@ -392,6 +474,13 @@ export class UnfairJeremias {
           trap.exposed = true;
         }
         if (trap.type === 'finaleCap') reason = 'DIE MÜNDUNGSHAUBE HAT DAS LETZTE WORT.';
+        if (trap.type === 'dripper') reason = 'KONDENSAT OHNE ABLAUF. DAS ÄTZT.';
+        if (trap.type === 'fan') reason = 'DER ABLUFTVENTILATOR HATTE VORFAHRT.';
+        if (trap.type === 'crusher') reason = 'QUALITÄTSPRÜFUNG NICHT BESTANDEN. GESTEMPELT.';
+        if (trap.type === 'mimicBand') {
+          reason = 'FÄLSCHUNG! KEIN ORIGINAL-JEREMIAS-KLEMMBAND.';
+          trap.sprung = true;
+        }
         this.kill(reason, trap.id);
         return;
       }
