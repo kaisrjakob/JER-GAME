@@ -37,7 +37,7 @@ export class AudioEngine {
     this.musicGain.gain.setTargetAtTime(this.settings.music, now, 0.02);
     this.sfxGain.gain.setTargetAtTime(this.settings.sfx, now, 0.02);
     if (this.bgMusic) {
-      this.bgMusic.volume = this.settings.muted ? 0 : this.settings.music * 0.5;
+      this.bgMusic.volume = this.settings.muted ? 0 : (this.settings.music || 0.5) * 0.5;
     }
   }
 
