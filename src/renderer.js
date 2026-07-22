@@ -236,6 +236,7 @@ export class UnfairRenderer {
   }
 
   drawFallingPipe(trap, state) {
+    if (trap.cleared) return;
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
     if (x < -180 || x > VIEW_WIDTH + 180) return;

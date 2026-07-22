@@ -3,6 +3,9 @@ export const VIEW_HEIGHT = 900;
 export const PLAYER_WIDTH = 54;
 export const PLAYER_HEIGHT = 82;
 export const LEVEL_END = 7200;
+export const GRAVITY = 2050;
+export const JUMP_SPEED = 760;
+export const RUN_SPEED = 330;
 
 export const STORAGE_KEYS = {
   highScore: 'jeremias-unfair-service.bestScore.v1',

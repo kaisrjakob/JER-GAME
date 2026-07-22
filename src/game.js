@@ -1,17 +1,13 @@
 import { AudioEngine } from './audio.js';
 import {
-  DEATH_MESSAGES, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, SECTIONS, VIEW_HEIGHT,
-  calculateScore, formatScore, sectionIndexForX
+  DEATH_MESSAGES, GRAVITY, JUMP_SPEED, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH,
+  RUN_SPEED, SECTIONS, VIEW_HEIGHT, calculateScore, formatScore, sectionIndexForX
 } from './config.js';
 import { UnfairRenderer } from './renderer.js';
 import { loadHighScore, loadSettings, saveHighScore, saveSettings } from './storage.js';
 import { activeTrapBox, createLevel, overlaps } from './track.js';
 
 const STEP = 1 / 120;
-const GRAVITY = 2050;
-const JUMP_SPEED = 760;
-const RUN_SPEED = 330;
-
 export class UnfairJeremias {
   constructor(canvas) {
     this.canvas = canvas;
@@ -230,7 +226,7 @@ export class UnfairJeremias {
       }
       if (platform.collapsible && platform.triggered) {
         platform.timer += dt;
-        if (platform.timer > .48) {
+        if (platform.timer > (platform.collapseDelay || .9)) {
           platform.fallSpeed += 1250 * dt;
           platform.fallY += platform.fallSpeed * dt;
         }
@@ -243,13 +239,31 @@ export class UnfairJeremias {
     for (const trap of this.state.level.traps) {
       if (!trap.triggered && playerX >= trap.triggerX) {
         trap.triggered = true;
+        if (trap.type === 'fallingPipe') trap.phase = 'falling';
         if (trap.type === 'spikes') this.audio.sfx('near');
       }
       if (!trap.triggered) continue;
       if (trap.type === 'spikes') trap.progress = Math.min(1, trap.progress + dt * 4.8);
       if (trap.type === 'fallingPipe') {
-        trap.vy += 1500 * dt;
-        trap.y = Math.min(trap.floorY - trap.height, trap.y + trap.vy * dt);
+        if (trap.phase === 'falling') {
+          trap.vy += 1500 * dt;
+          trap.y = Math.min(trap.floorY - trap.height, trap.y + trap.vy * dt);
+          if (trap.y >= trap.floorY - trap.height) {
+            trap.phase = 'resting';
+            trap.timer = 0;
+            this.callout('DW-ELEMENT UNTEN — SPRINGEN ODER KURZ WARTEN');
+          }
+        } else if (trap.phase === 'resting') {
+          trap.timer += dt;
+          if (trap.timer >= .8) trap.phase = 'retracting';
+        } else if (trap.phase === 'retracting') {
+          trap.y -= 820 * dt;
+          if (trap.y + trap.height < -20) {
+            trap.phase = 'cleared';
+            trap.cleared = true;
+            this.callout('DW-ELEMENT EINGEZOGEN — WEG FREI');
+          }
+        }
       }
       if (trap.type === 'pressure') trap.timer += dt;
     }
@@ -262,7 +276,9 @@ export class UnfairJeremias {
     for (const trap of state.level.traps) {
       const box = activeTrapBox(trap);
       if (box && overlaps(playerBox, box)) {
-        this.kill(trap.type === 'spikes' ? 'KAMINHAUBE VON UNTEN. GEMEIN.' : 'DW-ELEMENT IM ANFLUG');
+        this.kill(trap.type === 'spikes'
+          ? 'KAMINHAUBE VON UNTEN. GEMEIN.'
+          : 'DW-ELEMENT IM ANFLUG — SPRINGEN ODER WARTEN, BIS ES HOCHGEZOGEN WIRD');
         return;
       }
       if (trap.type === 'pressure' && trap.triggered && trap.timer > .28 && trap.timer < 1.1) {

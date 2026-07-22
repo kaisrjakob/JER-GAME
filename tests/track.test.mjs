@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LEVEL_END, SECTIONS, calculateScore, formatScore, sectionIndexForX } from '../src/config.js';
+import {
+  GRAVITY, JUMP_SPEED, LEVEL_END, PLAYER_WIDTH, RUN_SPEED, SECTIONS,
+  calculateScore, formatScore, sectionIndexForX
+} from '../src/config.js';
 import { activeTrapBox, createLevel, overlaps } from '../src/track.js';
 
 test('the hand-authored campaign covers all three Jeremias system sections', () => {
@@ -50,6 +53,77 @@ test('trap hitboxes activate only when the unfair surprise is live', () => {
   assert.deepEqual(activeTrapBox(pipe), {
     x: pipe.x, y: pipe.y, width: pipe.width, height: pipe.height
   });
+  pipe.cleared = true;
+  assert.equal(activeTrapBox(pipe), null);
+});
+
+test('every fallen pipe can be cleared by the configured jump', () => {
+  const jumpRise = JUMP_SPEED ** 2 / (2 * GRAVITY);
+  const pipes = createLevel().traps.filter((trap) => trap.type === 'fallingPipe');
+  assert.ok(pipes.length > 0);
+  for (const pipe of pipes) {
+    assert.ok(pipe.height <= jumpRise - 25, `${pipe.id} is too tall to jump`);
+    const airTime = 2 * JUMP_SPEED / GRAVITY;
+    assert.ok(pipe.width + PLAYER_WIDTH < RUN_SPEED * airTime, `${pipe.id} is too wide to jump`);
+  }
+});
+
+test('every raised chimney-cap spike field can be jumped', () => {
+  const jumpRise = JUMP_SPEED ** 2 / (2 * GRAVITY);
+  const airTime = 2 * JUMP_SPEED / GRAVITY;
+  const spikes = createLevel().traps.filter((trap) => trap.type === 'spikes');
+  for (const spike of spikes) {
+    assert.ok(spike.height < jumpRise, `${spike.id} is too high to jump`);
+    assert.ok(spike.width + PLAYER_WIDTH < RUN_SPEED * airTime, `${spike.id} is too wide to jump`);
+  }
+});
+
+test('every gap between consecutive platforms is reachable', () => {
+  const platforms = createLevel().platforms;
+  for (let index = 1; index < platforms.length; index += 1) {
+    const previous = platforms[index - 1];
+    const next = platforms[index];
+    const gap = next.x - (previous.x + previous.width);
+    const deltaY = next.y - previous.y;
+    const discriminant = JUMP_SPEED ** 2 + 2 * GRAVITY * deltaY;
+    assert.ok(discriminant >= 0, `${next.id} is above the maximum jump height`);
+    const descendingTime = (JUMP_SPEED + Math.sqrt(discriminant)) / GRAVITY;
+    const reachableGap = RUN_SPEED * descendingTime;
+    assert.ok(gap + PLAYER_WIDTH * .25 < reachableGap, `${next.id} is beyond jump range`);
+  }
+});
+
+test('the moving DW-VISION platform remains reachable at its highest point', () => {
+  const platforms = createLevel().platforms;
+  const liftIndex = platforms.findIndex((platform) => platform.id === 'vision-lift');
+  const previous = platforms[liftIndex - 1];
+  const lift = platforms[liftIndex];
+  const highestY = lift.y - 52;
+  const deltaY = highestY - previous.y;
+  const descendingTime = (JUMP_SPEED + Math.sqrt(JUMP_SPEED ** 2 + 2 * GRAVITY * deltaY)) / GRAVITY;
+  const physicalGap = lift.x - (previous.x + previous.width);
+  const playerAssistedGap = Math.max(0, physicalGap - (PLAYER_WIDTH - 16));
+  assert.ok(playerAssistedGap < RUN_SPEED * descendingTime);
+});
+
+test('pressure blasts leave a safe ground-level route', () => {
+  const level = createLevel();
+  const pressureTraps = level.traps.filter((trap) => trap.type === 'pressure');
+  for (const trap of pressureTraps) {
+    const approach = level.platforms.find((platform) => trap.triggerX >= platform.x && trap.triggerX < platform.x + platform.width);
+    assert.ok(approach, `${trap.id} has no approach platform`);
+    const standingPlayerTop = approach.y - 82 + 5;
+    const blastBottom = trap.y - 40;
+    assert.ok(blastBottom < standingPlayerTop, `${trap.id} blocks the safe ground route`);
+  }
+});
+
+test('collapsing roofs stay stable long enough to traverse', () => {
+  const roofs = createLevel().platforms.filter((platform) => platform.collapsible);
+  for (const roof of roofs) {
+    const crossingTime = (roof.width - PLAYER_WIDTH) / RUN_SPEED;
+    assert.ok(roof.collapseDelay > crossingTime, `${roof.id} collapses before it can be crossed`);
+  }
 });
 
 test('score rewards fast, clean runs and collected Jeremias clamp bands', () => {

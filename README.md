@@ -23,6 +23,8 @@ Auf Touch-Geräten stehen große Links-, Rechts- und Sprungtasten bereit. Das Zi
 - Fallen aus Kaminhauben, DW-Elementen und Prüföffnungen
 - Zielbauwerk als großer, gebrandeter FSA-X-Industrieschornstein
 
+Jede Falle besitzt mindestens einen reproduzierbaren Lösungsweg. Fallende DW-Elemente sind niedriger als die maximale Sprunghöhe und werden zusätzlich nach kurzer Zeit wieder eingezogen.
+
 Es werden keine Nintendo- oder Mario-Grafiken, Figuren, Musikstücke oder Markenzeichen verwendet.
 
 ## Entwicklung
