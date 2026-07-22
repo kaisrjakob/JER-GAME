@@ -78,6 +78,10 @@ export class AudioEngine {
       this.tone(620, 0.22, 0.08, 'sine', this.sfxGain, 0.06);
     } else if (name === 'near') {
       this.noise(0.1, 0.08, this.sfxGain);
+    } else if (name === 'slam') {
+      this.noise(0.2, 0.18, this.sfxGain);
+      this.tone(85, 0.26, 0.2, 'sawtooth', this.sfxGain);
+      this.tone(52, 0.34, 0.14, 'sine', this.sfxGain, 0.03);
     } else if (name === 'hit') {
       this.noise(0.28, 0.22, this.sfxGain);
       this.tone(62, 0.3, 0.24, 'sawtooth', this.sfxGain);

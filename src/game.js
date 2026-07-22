@@ -91,6 +91,7 @@ export class UnfairJeremias {
       elapsed: 0,
       deaths: 0,
       bands: 0,
+      deathsBySource: {},
       section: 0,
       checkpoint: { x: 120, y: 700 - PLAYER_HEIGHT, id: null },
       cameraX: 0,
@@ -185,6 +186,7 @@ export class UnfairJeremias {
     player.onGround = false;
     let standingPlatform = null;
     for (const platform of state.level.platforms) {
+      if (platform.phantom) continue;
       const y = platform.y + platform.fallY;
       const horizontal = player.x + PLAYER_WIDTH - 8 > platform.x && player.x + 8 < platform.x + platform.width;
       const bottom = player.y + PLAYER_HEIGHT;
@@ -196,6 +198,7 @@ export class UnfairJeremias {
         break;
       }
     }
+    this.collideGhostBlocks(previousBottom);
     if (standingPlatform?.collapsible && !standingPlatform.triggered) {
       standingPlatform.triggered = true;
       standingPlatform.timer = 0;
@@ -206,7 +209,12 @@ export class UnfairJeremias {
     this.checkBands();
     this.checkCheckpoints();
 
-    if (player.y > VIEW_HEIGHT + 140) this.kill('ABSTURZ ZWISCHEN DEN ABGASSYSTEMEN');
+    if (player.y > VIEW_HEIGHT + 140) {
+      const center = player.x + PLAYER_WIDTH / 2;
+      const phantom = state.level.platforms.find((item) => item.phantom && center >= item.x && center <= item.x + item.width);
+      if (phantom) this.kill('DURCHGEROSTETES BLECH. KEIN ORIGINAL-JEREMIAS-MATERIAL.', phantom.id);
+      else this.kill('ABSTURZ ZWISCHEN DEN ABGASSYSTEMEN', 'absturz');
+    }
     if (player.x >= state.level.finish.x + 105 && player.y < state.level.finish.y) this.win();
 
     const section = sectionIndexForX(player.x);
@@ -218,6 +226,32 @@ export class UnfairJeremias {
     state.cameraX += (targetCamera - state.cameraX) * Math.min(1, dt * 4.8);
     this.audio.setIntensity(.35 + section * .25);
     this.updateHud();
+  }
+
+  collideGhostBlocks(previousBottom) {
+    const player = this.state.player;
+    for (const trap of this.state.level.traps) {
+      if (trap.type !== 'ghostBlock') continue;
+      const box = { x: player.x + 8, y: player.y + 5, width: PLAYER_WIDTH - 16, height: PLAYER_HEIGHT - 7 };
+      if (!overlaps(box, trap)) continue;
+      const reveal = !trap.revealed;
+      if (player.vy < 0) {
+        player.y = trap.y + trap.height;
+        player.vy = 60;
+      } else if (previousBottom <= trap.y + 5) {
+        player.y = trap.y - PLAYER_HEIGHT;
+        player.vy = 0;
+        player.onGround = true;
+      } else {
+        continue;
+      }
+      if (reveal) {
+        trap.revealed = true;
+        this.audio.sfx('near');
+        this.renderer.emit(trap.x + trap.width / 2, trap.y + trap.height / 2, '#9fb8c8', 14);
+        this.callout('UNSICHTBARES DW-ELEMENT — NICHT IM KATALOG.');
+      }
+    }
   }
 
   updatePlatforms(dt) {
@@ -243,6 +277,10 @@ export class UnfairJeremias {
         if (trap.type === 'fallingPipe') trap.phase = 'falling';
         if (trap.type === 'swingCap') trap.phase = 'arming';
         if (trap.type === 'spikes') this.audio.sfx('near');
+        if (trap.type === 'finaleCap') {
+          trap.phase = 'wobble';
+          this.audio.sfx('near');
+        }
       }
       if (!trap.triggered) continue;
       if (trap.type === 'spikes') trap.progress = Math.min(1, trap.progress + dt * 4.8);
@@ -285,6 +323,34 @@ export class UnfairJeremias {
           }
         }
       }
+      if (trap.type === 'finaleCap') {
+        if (trap.phase === 'wobble') {
+          trap.timer += dt;
+          trap.angle = Math.sin(trap.timer * 70) * .08;
+          if (trap.timer >= .4) {
+            trap.phase = 'falling';
+            trap.timer = 0;
+            this.audio.sfx('near');
+          }
+        } else if (trap.phase === 'falling') {
+          trap.vy += 2400 * dt;
+          trap.y = Math.min(trap.floorY - trap.height, trap.y + trap.vy * dt);
+          if (trap.y >= trap.floorY - trap.height) {
+            trap.phase = 'resting';
+            trap.timer = 0;
+            trap.angle = 0;
+            this.audio.sfx('slam');
+            this.renderer.emit(trap.x + trap.width / 2, trap.floorY, '#cfdce3', 22);
+          }
+        } else if (trap.phase === 'resting') {
+          trap.timer += dt;
+          if (trap.timer >= 1.4) {
+            trap.phase = 'toppled';
+            trap.cleared = true;
+            this.callout('MÜNDUNGSHAUBE GELANDET — JETZT ABER.');
+          }
+        }
+      }
     }
   }
 
@@ -321,13 +387,18 @@ export class UnfairJeremias {
         let reason = 'DW-ELEMENT IM ANFLUG — SPRINGEN ODER WARTEN, BIS ES HOCHGEZOGEN WIRD';
         if (trap.type === 'spikes') reason = 'KAMINHAUBE VON UNTEN. GEMEIN.';
         if (trap.type === 'swingCap') reason = 'DIE KAMINHAUBE WAR WOHL NICHT FEST VERSCHRAUBT';
-        this.kill(reason);
+        if (trap.type === 'fakeCheckpoint') {
+          reason = 'DIESER SERVICEPUNKT WAR NICHT ZERTIFIZIERT.';
+          trap.exposed = true;
+        }
+        if (trap.type === 'finaleCap') reason = 'DIE MÜNDUNGSHAUBE HAT DAS LETZTE WORT.';
+        this.kill(reason, trap.id);
         return;
       }
       if (trap.type === 'pressure' && trap.triggered && trap.timer > .28 && trap.timer < 1.1) {
         const blast = { x: trap.x - 190, y: trap.y - 170, width: 210, height: 130 };
         if (overlaps(playerBox, blast)) {
-          this.kill('DRUCKSTOSS AUS DER PRÜFÖFFNUNG');
+          this.kill('DRUCKSTOSS AUS DER PRÜFÖFFNUNG', trap.id);
           return;
         }
       }
@@ -353,7 +424,7 @@ export class UnfairJeremias {
     for (const checkpoint of this.state.level.checkpoints) {
       if (!checkpoint.active && this.state.player.x >= checkpoint.x) {
         checkpoint.active = true;
-        const platform = this.state.level.platforms.find((item) => checkpoint.x >= item.x && checkpoint.x < item.x + item.width);
+        const platform = this.state.level.platforms.find((item) => !item.phantom && checkpoint.x >= item.x && checkpoint.x < item.x + item.width);
         this.state.checkpoint = {
           id: checkpoint.id,
           x: checkpoint.x + 28,
@@ -365,13 +436,19 @@ export class UnfairJeremias {
     }
   }
 
-  kill(reason) {
+  kill(reason, sourceId = null) {
     if (!this.state || this.state.mode !== 'playing') return;
     this.state.mode = 'dead';
     this.state.deaths += 1;
     this.state.respawnTimer = 1.05;
     this.audio.sfx('hit');
-    this.ui.deathMessage.textContent = reason + ' — ' + DEATH_MESSAGES[(this.state.deaths - 1) % DEATH_MESSAGES.length];
+    let suffix = DEATH_MESSAGES[(this.state.deaths - 1) % DEATH_MESSAGES.length];
+    if (sourceId) {
+      this.state.deathsBySource[sourceId] = (this.state.deathsBySource[sourceId] || 0) + 1;
+      const count = this.state.deathsBySource[sourceId];
+      if (count >= 3) suffix = 'ZUM ' + count + '. MAL GENAU HIER.';
+    }
+    this.ui.deathMessage.textContent = reason + ' — ' + suffix;
     this.ui.deathOverlay.classList.add('death-overlay--active');
     this.ui.flash.classList.remove('hit');
     void this.ui.flash.offsetWidth;
