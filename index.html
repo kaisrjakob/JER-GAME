@@ -1,22 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Chimney Challenge – Jeremias Game</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chimney Challenge – Jeremias Premium</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div id="start-screen" class="screen">
+    <img src="assets/logo.png" alt="Jeremias Logo" class="logo">
     <h1>Chimney Challenge</h1>
     <button id="start-btn">Start Game</button>
+    <p class="branding">by Jeremias Abgastechnik</p>
   </div>
+
   <canvas id="gameCanvas"></canvas>
+
   <div id="game-over" class="screen">
     <h2>Game Over</h2>
     <p id="final-score"></p>
+    <p id="high-score"></p>
     <button id="restart-btn">Restart</button>
   </div>
+
   <script src="game.js"></script>
 </body>
 </html>
