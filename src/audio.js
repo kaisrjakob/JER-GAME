@@ -1,6 +1,6 @@
 export class AudioEngine {
   constructor(settings) {
-    this.settings = settings;
+    this.settings = settings || {};
     this.context = null;
     this.master = null;
     this.musicGain = null;
@@ -8,8 +8,6 @@ export class AudioEngine {
     this.timer = null;
     this.beat = 0;
     this.intensity = 0;
-    this.bgMusic = null;
-    this.bgMusicLoaded = false;
   }
 
   async ensure() {
@@ -25,27 +23,27 @@ export class AudioEngine {
       this.master.connect(this.context.destination);
       this.applySettings();
     }
-    if (!this.bgMusic) {
-      const elem = document.getElementById('bg-music');
-      if (elem) {
-        this.bgMusic = elem;
-        this.bgMusic.addEventListener('canplay', () => {
-          this.bgMusicLoaded = true;
-        });
-      }
+    if (this.context && this.context.state === 'suspended') {
+      await this.context.resume();
     }
-    if (this.context.state === 'suspended') await this.context.resume();
   }
 
   applySettings() {
     if (!this.context) return;
+    
+    // Ensure all settings have valid values
+    const settings = {
+      muted: this.settings?.muted ?? false,
+      music: this.settings?.music ?? 0.58,
+      sfx: this.settings?.sfx ?? 0.78
+    };
+    
     const now = this.context.currentTime;
-    this.master.gain.setTargetAtTime(this.settings.muted ? 0 : 0.72, now, 0.02);
-    this.musicGain.gain.setTargetAtTime(this.settings.music || 0.5, now, 0.02);
-    this.sfxGain.gain.setTargetAtTime(this.settings.sfx || 0.5, now, 0.02);
-    if (this.bgMusic && this.bgMusicLoaded) {
-      this.bgMusic.volume = this.settings.muted ? 0 : (this.settings.music || 0.5) * 0.5;
-    }
+    const masterGain = settings.muted ? 0 : 0.72;
+    
+    this.master.gain.setTargetAtTime(masterGain, now, 0.02);
+    this.musicGain.gain.setTargetAtTime(settings.music, now, 0.02);
+    this.sfxGain.gain.setTargetAtTime(settings.sfx, now, 0.02);
   }
 
   async start() {
@@ -53,21 +51,12 @@ export class AudioEngine {
     if (!this.context || this.timer) return;
     this.beat = 0;
     this.timer = window.setInterval(() => this.musicTick(), 145);
-    if (this.bgMusic && this.bgMusicLoaded && this.bgMusic.paused) {
-      try {
-        await this.bgMusic.play();
-      } catch (err) {
-        console.warn('Background music autoplay failed:', err);
-      }
-    }
   }
 
   stop() {
-    if (this.timer) clearInterval(this.timer);
-    this.timer = null;
-    if (this.bgMusic && this.bgMusicLoaded) {
-      this.bgMusic.pause();
-      this.bgMusic.currentTime = 0;
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
     }
   }
 
@@ -76,6 +65,7 @@ export class AudioEngine {
   }
 
   toggleMute() {
+    if (!this.settings) this.settings = {};
     this.settings.muted = !this.settings.muted;
     this.applySettings();
     return this.settings.muted;
