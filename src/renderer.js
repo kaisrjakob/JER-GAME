@@ -665,7 +665,7 @@ export class UnfairRenderer {
     
     const spriteWidth = this.playerSprite.width;
     const spriteHeight = this.playerSprite.height;
-    const scale = Math.min(PLAYER_WIDTH / spriteWidth, PLAYER_HEIGHT / spriteHeight) * 0.95;
+    const scale = Math.min(PLAYER_WIDTH / spriteWidth, PLAYER_HEIGHT / spriteHeight);
     
     ctx.drawImage(
       this.playerSprite,
