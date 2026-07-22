@@ -13,6 +13,7 @@ export class UnfairRenderer {
     this.clampBand = null;
     this.dwPipe = null;
     this.rainCap = null;
+    this.playerSprite = null;
     this.particles = [];
     this.width = 1;
     this.height = 1;
@@ -24,7 +25,8 @@ export class UnfairRenderer {
   async load(progress = () => {}) {
     const sources = [
       ...SECTIONS.map((section) => section.asset), 'assets/jeremias-logo.png',
-      GAME_ASSETS.clampBand, GAME_ASSETS.dwPipe, GAME_ASSETS.rainCap
+      GAME_ASSETS.clampBand, GAME_ASSETS.dwPipe, GAME_ASSETS.rainCap,
+      'assets/game/ChatGPT Image 22. Juli 2026, 22_30_51.png'
     ];
     let loaded = 0;
     const images = await Promise.all(sources.map((source) => new Promise((resolve, reject) => {
@@ -43,6 +45,7 @@ export class UnfairRenderer {
     this.clampBand = images[sectionCount + 1];
     this.dwPipe = images[sectionCount + 2];
     this.rainCap = images[sectionCount + 3];
+    this.playerSprite = images[sectionCount + 4];
   }
 
   resize() {
@@ -467,35 +470,49 @@ export class UnfairRenderer {
     const x = this.worldX(trap.x, state);
     if (x < -200 || x > VIEW_WIDTH + 200) return;
     const cx = x + trap.thickness / 2;
-    ctx.fillStyle = '#17364e';
+    
+    ctx.fillStyle = '#1a4a67';
     ctx.fillRect(x - 14, trap.cy - trap.radius - 26, trap.thickness + 28, 26);
-    ctx.fillStyle = '#ff7a1a';
+    ctx.fillStyle = '#ff8c1a';
     for (let stripe = x - 10; stripe < x + trap.thickness + 12; stripe += 18) {
       ctx.fillRect(stripe, trap.cy - trap.radius - 18, 9, 5);
     }
+    
     ctx.save();
     ctx.translate(cx, trap.cy);
     ctx.rotate(0);
-    ctx.strokeStyle = '#b7cdd9';
-    ctx.lineWidth = 11;
+    
+    ctx.strokeStyle = '#e8f0f5';
+    ctx.lineWidth = 13;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
     for (let blade = 0; blade < 4; blade += 1) {
       const angle = trap.angle + blade * Math.PI / 2;
-      ctx.globalAlpha = .95;
+      ctx.globalAlpha = .9;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.lineTo(Math.cos(angle) * 8, Math.sin(angle) * trap.radius);
       ctx.stroke();
     }
+    
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#0d83d5';
+    ctx.shadowColor = 'rgba(13, 131, 213, 0.5)';
+    ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(0, 0, 12, 0, Math.PI * 2);
     ctx.fill();
+    
+    ctx.shadowColor = 'transparent';
+    ctx.fillStyle = '#1a5a8f';
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fill();
+    
     ctx.restore();
-    ctx.fillStyle = '#cfdce3';
-    ctx.font = '700 11px "Barlow Condensed",sans-serif';
-    ctx.fillText('ABLUFT', x - 6, trap.cy - trap.radius - 34);
+    ctx.fillStyle = '#e8f0f5';
+    ctx.font = '700 12px "Barlow Condensed",sans-serif';
+    ctx.fillText('LÜFTER', x - 12, trap.cy - trap.radius - 34);
   }
 
   drawSteamVent(trap, state, time) {
@@ -628,34 +645,36 @@ export class UnfairRenderer {
     const ctx = this.ctx;
     const player = state.player;
     const x = this.worldX(player.x, state);
-    const phase = time * .015;
-    const leg = player.onGround && Math.abs(player.vx) > 20 ? Math.sin(phase) * 17 : 5;
-    const arm = player.onGround && Math.abs(player.vx) > 20 ? -leg * .7 : -9;
+    
+    if (!this.playerSprite) return;
+    
+    player.animationTime += state.renderDelta;
+    player.lastVx = player.vx;
+    
     ctx.save();
+    
+    if (player.invulnerable > 0 && Math.floor(time / 80) % 2 === 0) {
+      ctx.globalAlpha = 0.4;
+    }
+    
     ctx.translate(x + PLAYER_WIDTH / 2, player.y + PLAYER_HEIGHT / 2);
-    if (player.invulnerable > 0 && Math.floor(time / 80) % 2 === 0) ctx.globalAlpha = .28;
     ctx.scale(player.facing, 1);
-    ctx.rotate(player.onGround ? 0 : Math.max(-.18, Math.min(.22, player.vy / 1800)));
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = '#08243d';
-    ctx.lineWidth = 13;
-    ctx.beginPath();
-    ctx.moveTo(-8, 24); ctx.lineTo(-13 + leg, 49);
-    ctx.moveTo(8, 24); ctx.lineTo(13 - leg, 49);
-    ctx.stroke();
-    ctx.strokeStyle = '#0871bd';
-    ctx.lineWidth = 11;
-    ctx.beginPath();
-    ctx.moveTo(-18, -8); ctx.lineTo(-25 + arm, 16);
-    ctx.moveTo(18, -8); ctx.lineTo(25 - arm, 16);
-    ctx.stroke();
-    ctx.fillStyle = '#075d9e';
-    roundRect(ctx, -23, -31, 46, 63, 14); ctx.fill();
-    ctx.fillStyle = '#ff7a1a'; ctx.fillRect(-23, -7, 46, 16);
-    ctx.fillStyle = '#dceaf1'; ctx.beginPath(); ctx.arc(0, -42, 20, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#ff892b'; ctx.fillRect(-24, -54, 48, 12);
-    ctx.fillStyle = '#17364e'; ctx.fillRect(4, -45, 17, 7);
-    ctx.fillStyle = '#fff'; ctx.font = '800 13px "Barlow Condensed",sans-serif'; ctx.textAlign = 'center'; ctx.fillText('J', 0, 7);
+    
+    const tilt = player.onGround ? 0 : Math.max(-0.15, Math.min(0.18, player.vy / 1800));
+    ctx.rotate(tilt);
+    
+    const spriteWidth = this.playerSprite.width;
+    const spriteHeight = this.playerSprite.height;
+    const scale = Math.min(PLAYER_WIDTH / spriteWidth, PLAYER_HEIGHT / spriteHeight) * 0.95;
+    
+    ctx.drawImage(
+      this.playerSprite,
+      -spriteWidth * scale / 2,
+      -spriteHeight * scale / 2,
+      spriteWidth * scale,
+      spriteHeight * scale
+    );
+    
     ctx.restore();
   }
 

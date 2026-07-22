@@ -1,11 +1,11 @@
 export const VIEW_WIDTH = 1600;
 export const VIEW_HEIGHT = 900;
-export const PLAYER_WIDTH = 54;
-export const PLAYER_HEIGHT = 82;
+export const PLAYER_WIDTH = 46;
+export const PLAYER_HEIGHT = 68;
 export const LEVEL_END = 12000;
 export const GRAVITY = 2050;
-export const JUMP_SPEED = 760;
-export const RUN_SPEED = 330;
+export const JUMP_SPEED = 850;
+export const RUN_SPEED = 420;
 export const STEAM_BOOST = 980;
 
 export const GAME_ASSETS = {

@@ -122,7 +122,9 @@ export class UnfairJeremias {
       onIce: false,
       coyote: .1,
       jumpBuffer: 0,
-      invulnerable: 0
+      invulnerable: 0,
+      animationTime: 0,
+      lastVx: 0
     };
   }
 
@@ -160,7 +162,7 @@ export class UnfairJeremias {
 
     const direction = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
     if (direction !== 0) {
-      player.vx += direction * (player.onIce ? 620 : 1900) * dt;
+      player.vx += direction * (player.onIce ? 620 : 2400) * dt;
       player.facing = direction;
     } else {
       player.vx *= Math.pow(player.onIce ? .45 : .0007, dt);
