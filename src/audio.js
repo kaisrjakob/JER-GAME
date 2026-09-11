@@ -60,6 +60,11 @@ export class AudioEngine {
     }
   }
 
+  suspend() {
+    this.stop();
+    if (this.context?.state === 'running') this.context.suspend().catch(() => {});
+  }
+
   setIntensity(value) {
     this.intensity = Math.max(0, Math.min(1, value));
   }

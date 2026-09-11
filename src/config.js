@@ -1,4 +1,5 @@
-export const VIEW_WIDTH = 1600;
+export const VIEW_WIDTH_MIN = 1600;
+export const VIEW_WIDTH_MAX = 2000;
 export const VIEW_HEIGHT = 900;
 export const PLAYER_WIDTH = 60;
 export const PLAYER_HEIGHT = 90;
@@ -11,7 +12,8 @@ export const STEAM_BOOST = 980;
 export const GAME_ASSETS = {
   clampBand: 'assets/game/clamp-band.png',
   dwPipe: 'assets/game/dw-pipe.png',
-  rainCap: 'assets/game/rain-cap.png'
+  rainCap: 'assets/game/rain-cap.png',
+  player: 'assets/game/player.png'
 };
 
 export const STORAGE_KEYS = {

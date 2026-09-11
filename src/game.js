@@ -4,8 +4,11 @@ import {
   RUN_SPEED, SECTIONS, STEAM_BOOST, VIEW_HEIGHT, calculateScore, formatScore, sectionIndexForX
 } from './config.js';
 import { UnfairRenderer } from './renderer.js';
+import { QualityMonitor } from './quality.js';
 import { loadHighScore, loadSettings, saveHighScore, saveSettings } from './storage.js';
+import { TouchControls } from './touch.js';
 import { activeTrapBox, createLevel, overlaps } from './track.js';
+import { cameraTarget } from './viewport.js';
 
 const STEP = 1 / 120;
 export class UnfairJeremias {
@@ -28,6 +31,16 @@ export class UnfairJeremias {
       restart: () => this.restartFromCheckpoint(),
       pause: () => this.togglePause()
     });
+    this.touch = new TouchControls({
+      layer: this.ui.touchLayer,
+      zones: { left: this.ui.touchLeft, right: this.ui.touchRight, jump: this.ui.touchJump },
+      input: this.input,
+      jump: () => this.requestJump(),
+      releaseJump: () => this.releaseJump()
+    });
+    this.quality = new QualityMonitor(() => this.renderer.applyQuality());
+    if (this.settings.quality !== 'auto') this.quality.lock(this.settings.quality);
+    this.wakeLock = null;
   }
 
   collectUi() {
@@ -38,25 +51,44 @@ export class UnfairJeremias {
       'death-message', 'pause-screen', 'resume-button', 'restart-pause-button', 'menu-pause-button',
       'win-screen', 'final-score', 'final-time', 'final-deaths', 'final-bands', 'new-best',
       'restart-button', 'menu-button', 'section-card', 'section-kicker', 'section-title',
-      'section-copy', 'callout', 'flash', 'touch-left', 'touch-right', 'touch-jump'
+      'section-copy', 'callout', 'flash', 'touch-layer', 'touch-left', 'touch-right', 'touch-jump',
+      'rotate-hint', 'rotate-anyway', 'rotate-flip', 'rotate-reset-button'
     ];
     return Object.fromEntries(ids.map((id) => [camel(id), document.getElementById(id)]));
   }
 
   async boot() {
     this.bindUi();
+    this.applyRotation();
     this.ui.menuHighscore.textContent = formatScore(this.bestScore);
     this.ui.audioButton.textContent = this.settings.muted ? '×' : '♫';
-    await this.renderer.load((progress) => {
-      this.ui.loadingProgress.style.width = Math.round(progress * 100) + '%';
-    });
+    try {
+      await this.renderer.load((progress) => {
+        this.ui.loadingProgress.style.width = Math.round(progress * 100) + '%';
+      });
+    } catch (error) {
+      this.ui.loadingScreen.querySelector('p').textContent = 'MATERIAL FEHLT — ' + error.message;
+      return;
+    }
+    await this.loadCanvasFonts();
     await new Promise((resolve) => setTimeout(resolve, 220));
     this.showOnly(this.ui.menuScreen);
     requestAnimationFrame((time) => this.frame(time));
   }
 
+  async loadCanvasFonts() {
+    if (!document.fonts) return;
+    const faces = ['700 15px "Barlow Condensed"', '800 22px "Barlow Condensed"'];
+    try {
+      await Promise.all(faces.map((face) => document.fonts.load(face)));
+    } catch { /* Canvas faellt auf die Systemschrift zurueck */ }
+  }
+
   bindUi() {
-    this.ui.startButton.addEventListener('click', () => this.start());
+    this.ui.startButton.addEventListener('click', () => {
+      if (matchMedia('(pointer: coarse)').matches) this.enterImmersiveMode();
+      this.start();
+    });
     this.ui.howButton.addEventListener('click', () => this.ui.howScreen.classList.add('screen--active'));
     document.querySelectorAll('[data-close]').forEach((button) => button.addEventListener('click', () => {
       document.getElementById(button.dataset.close).classList.remove('screen--active');
@@ -72,16 +104,50 @@ export class UnfairJeremias {
       this.ui.audioButton.textContent = muted ? '×' : '♫';
       saveSettings(this.settings);
     });
-    bindHold(this.ui.touchLeft, (pressed) => { this.input.left = pressed; });
-    bindHold(this.ui.touchRight, (pressed) => { this.input.right = pressed; });
-    this.ui.touchJump.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      this.requestJump();
-    });
-    this.ui.touchJump.addEventListener('pointerup', () => this.releaseJump());
+    this.ui.rotateAnyway.addEventListener('click', () => this.setRotation('cw'));
+    this.ui.rotateFlip.addEventListener('click', () => this.setRotation('ccw'));
+    this.ui.rotateResetButton.addEventListener('click', () => this.setRotation(
+      { auto: 'cw', cw: 'ccw', ccw: 'auto' }[this.settings.rotate]
+    ));
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden && this.state?.mode === 'playing') this.pause();
+      if (document.hidden) {
+        if (this.state?.mode === 'playing') this.pause();
+        this.audio.suspend();
+      } else {
+        this.requestWakeLock();
+        this.audio.ensure().catch(() => {});
+      }
     });
+    document.addEventListener('fullscreenchange', () => this.requestWakeLock());
+    for (const name of ['pointerdown', 'keydown']) {
+      addEventListener(name, () => { if (this.audio.context?.state === 'suspended') this.audio.ensure().catch(() => {}); });
+    }
+  }
+
+  setRotation(mode) {
+    this.settings.rotate = mode;
+    saveSettings(this.settings);
+    this.applyRotation();
+  }
+
+  applyRotation() {
+    document.body.classList.toggle('forced', this.settings.rotate !== 'auto');
+    document.body.classList.toggle('ccw', this.settings.rotate === 'ccw');
+  }
+
+  async requestWakeLock() {
+    if (document.hidden || !navigator.wakeLock) return;
+    try {
+      this.wakeLock = await navigator.wakeLock.request('screen');
+    } catch {
+      this.wakeLock = null;
+    }
+  }
+
+  async enterImmersiveMode() {
+    try { await document.documentElement.requestFullscreen?.(); } catch { /* iOS Safari */ }
+    try { await screen.orientation?.lock?.('landscape'); } catch { /* iOS Safari */ }
+    this.requestWakeLock();
   }
 
   async start() {
@@ -101,6 +167,7 @@ export class UnfairJeremias {
     };
     this.hideScreens();
     this.ui.hud.classList.add('hud--active');
+    document.body.classList.add('running');
     this.ui.readyOverlay.classList.add('ready-overlay--active');
     this.ui.deathOverlay.classList.remove('death-overlay--active');
     document.querySelector('.site-footer').style.display = 'none';
@@ -237,7 +304,7 @@ export class UnfairJeremias {
       state.section = section;
       this.showSection(section);
     }
-    const targetCamera = Math.max(0, Math.min(LEVEL_END - 1100, player.x - 420));
+    const targetCamera = cameraTarget(player.x);
     state.cameraX += (targetCamera - state.cameraX) * Math.min(1, dt * 4.8);
     this.audio.setIntensity(.3 + section * .15);
     this.updateHud();
@@ -562,7 +629,7 @@ export class UnfairJeremias {
     this.state.bands = bands;
     this.state.player = this.makePlayer(checkpoint.x, checkpoint.y);
     this.state.player.invulnerable = .65;
-    this.state.cameraX = Math.max(0, checkpoint.x - 420);
+    this.state.cameraX = cameraTarget(checkpoint.x);
     this.state.mode = 'playing';
     this.ui.deathOverlay.classList.remove('death-overlay--active');
   }
@@ -628,6 +695,7 @@ export class UnfairJeremias {
     this.state.previousMode = this.state.mode;
     this.state.mode = 'paused';
     this.ui.pauseScreen.classList.add('screen--active');
+    this.touch.releaseAll();
     this.audio.stop();
   }
 
@@ -646,10 +714,12 @@ export class UnfairJeremias {
   }
 
   toMenu() {
+    this.touch.releaseAll();
     this.audio.stop();
     if (this.state) this.state.mode = 'menu';
     this.hideScreens();
     this.ui.hud.classList.remove('hud--active');
+    document.body.classList.remove('running');
     this.ui.readyOverlay.classList.remove('ready-overlay--active');
     this.ui.deathOverlay.classList.remove('death-overlay--active');
     this.ui.menuHighscore.textContent = formatScore(this.bestScore);
@@ -669,6 +739,7 @@ export class UnfairJeremias {
   }
 
   frame(time) {
+    const started = performance.now();
     const dt = Math.min(.05, Math.max(0, (time - this.lastTime) / 1000));
     this.lastTime = time;
     if (this.state && ['playing', 'dead'].includes(this.state.mode)) {
@@ -682,17 +753,20 @@ export class UnfairJeremias {
       this.state.renderDelta = dt;
       this.renderer.render(this.state, time);
     }
+    this.quality.sample(time, performance.now() - started);
     requestAnimationFrame((next) => this.frame(next));
   }
 }
 
 class PlatformInput {
   constructor({ canvas, jump, releaseJump, restart, pause }) {
-    this.left = false;
-    this.right = false;
+    this.keyLeft = false;
+    this.keyRight = false;
+    this.touchLeft = false;
+    this.touchRight = false;
     addEventListener('keydown', (event) => {
-      if (['KeyA', 'ArrowLeft'].includes(event.code)) this.left = true;
-      if (['KeyD', 'ArrowRight'].includes(event.code)) this.right = true;
+      if (['KeyA', 'ArrowLeft'].includes(event.code)) this.keyLeft = true;
+      if (['KeyD', 'ArrowRight'].includes(event.code)) this.keyRight = true;
       if (['Space', 'KeyW', 'ArrowUp'].includes(event.code)) {
         event.preventDefault();
         if (!event.repeat) jump();
@@ -701,8 +775,8 @@ class PlatformInput {
       if (!event.repeat && (event.code === 'Escape' || event.code === 'KeyP')) pause();
     }, { passive: false });
     addEventListener('keyup', (event) => {
-      if (['KeyA', 'ArrowLeft'].includes(event.code)) this.left = false;
-      if (['KeyD', 'ArrowRight'].includes(event.code)) this.right = false;
+      if (['KeyA', 'ArrowLeft'].includes(event.code)) this.keyLeft = false;
+      if (['KeyD', 'ArrowRight'].includes(event.code)) this.keyRight = false;
       if (['Space', 'KeyW', 'ArrowUp'].includes(event.code)) releaseJump();
     });
     canvas.addEventListener('pointerdown', (event) => {
@@ -710,11 +784,10 @@ class PlatformInput {
     });
     canvas.addEventListener('pointerup', releaseJump);
   }
-}
 
-function bindHold(element, callback) {
-  element.addEventListener('pointerdown', (event) => { event.preventDefault(); callback(true); });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach((name) => element.addEventListener(name, () => callback(false)));
+  get left() { return this.keyLeft || this.touchLeft; }
+
+  get right() { return this.keyRight || this.touchRight; }
 }
 
 function formatTime(seconds) {

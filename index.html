@@ -16,7 +16,8 @@
       <p class="eyebrow">DIE GEMEINSTE SCHICHT DES JAHRES</p>
       <h1><em>UNFAIR</em><span>JEREMIAS</span>NACHTSCHICHT</h1>
       <p class="hero__copy">Erreiche den großen FSA-X-Industrieschornstein hinter dem Prüfstand. Vertraue keinem Klemmband, keiner Montagebühne, keinem Zielschild — und ab der Sturmtrasse nicht einmal mehr dem Wetter.</p>
-      <div class="mission-rule"><div><kbd>A</kbd><kbd>D</kbd><b>LAUFEN</b></div><div><kbd>SPACE</kbd><b>SPRINGEN</b></div><div><kbd>R</kbd><b>CHECKPOINT</b></div></div>
+      <div class="mission-rule keys"><div><kbd>A</kbd><kbd>D</kbd><b>LAUFEN</b></div><div><kbd>SPACE</kbd><b>SPRINGEN</b></div><div><kbd>R</kbd><b>CHECKPOINT</b></div></div>
+      <div class="mission-rule taps"><div><kbd>←</kbd><kbd>→</kbd><b>LAUFEN</b></div><div><kbd>SPRUNG</kbd><b>SPRINGEN</b></div></div>
       <div class="hero__actions"><button id="start-button" class="button button--primary">NACHTSCHICHT STARTEN <b>→</b></button><button id="how-button" class="button button--ghost">WAS MUSS ICH TUN?</button></div>
       <div class="best"><span>BESTER EINSATZ</span><strong id="menu-highscore">000000</strong></div>
     </div>
@@ -29,7 +30,8 @@
       <article><span class="briefing__number">02</span><h3>Nichts glauben</h3><p>Kaminhauben, DW-Elemente, Prüföffnungen und Plattformen können Fallen sein. Auf dem Winterdach schieben Böen und Glatteis, im Prüfstand takten Pressen und Ventilatoren — und nicht jedes Klemmband ist ein Original.</p></article>
       <article><span class="briefing__number">03</span><h3>Stellen lernen</h3><p>Nach jedem Tod startest du am letzten blauen Jeremias-Servicepunkt.</p></article>
     </div>
-    <div class="controls"><span><kbd>A</kbd><kbd>←</kbd> LINKS</span><span><kbd>D</kbd><kbd>→</kbd> RECHTS</span><span><kbd>SPACE</kbd> SPRINGEN</span><span><kbd>R</kbd> NEU</span></div>
+    <div class="controls keys"><span><kbd>A</kbd><kbd>←</kbd> LINKS</span><span><kbd>D</kbd><kbd>→</kbd> RECHTS</span><span><kbd>SPACE</kbd> SPRINGEN</span><span><kbd>R</kbd> NEU</span></div>
+    <div class="controls taps"><span>Daumen links: <kbd>←</kbd><kbd>→</kbd></span><span>Daumen rechts: <kbd>SPRUNG</kbd></span><span>Tippen irgendwo: SPRINGEN</span></div>
     <button class="button button--primary" data-close="how-screen">VERSTANDEN</button>
   </div></section>
 
@@ -40,15 +42,29 @@
     <div class="progress"><i id="campaign-progress"></i><span>START</span><span>DW-FU</span><span>DW-VISION</span><span>FSA-X</span><span>STURM</span><span>PRÜFSTAND</span></div>
   </section>
 
-  <section id="ready-overlay" class="ready-overlay"><div class="ready-card"><p>DEIN AUFTRAG</p><h2>ERREICHE DEN<br><b>FSA-X-TURM</b></h2><div><kbd>A</kbd><kbd>D</kbd><span>LAUFEN</span><kbd>SPACE</kbd><span>SPRINGEN</span></div><strong>DRÜCKE LEERTASTE ZUM START</strong><small>WARNUNG: Das Level spielt unfair. Die Steuerung nicht.</small></div></section>
+  <section id="ready-overlay" class="ready-overlay"><div class="ready-card"><p>DEIN AUFTRAG</p><h2>ERREICHE DEN<br><b>FSA-X-TURM</b></h2><div class="keys"><kbd>A</kbd><kbd>D</kbd><span>LAUFEN</span><kbd>SPACE</kbd><span>SPRINGEN</span></div><div class="taps"><kbd>←</kbd><kbd>→</kbd><span>LAUFEN</span><kbd>SPRUNG</kbd><span>SPRINGEN</span></div><strong class="keys">DRÜCKE LEERTASTE ZUM START</strong><strong class="taps">TIPPEN ZUM START</strong><small>WARNUNG: Das Level spielt unfair. Die Steuerung nicht.</small></div></section>
   <section id="death-overlay" class="death-overlay"><span>×</span><strong id="death-message">JETZT KENNST DU DIE STELLE.</strong></section>
   <section id="section-card" class="section-card"><p id="section-kicker">ABSCHNITT 01</p><h2 id="section-title">DW-FU</h2><span id="section-copy">Klemmbänder und die erste Gemeinheit.</span></section>
   <div id="callout" class="callout">SERVICEPUNKT AKTIV</div>
 
-  <section id="pause-screen" class="screen panel-screen"><div class="panel"><p class="eyebrow">EINSATZ PAUSIERT</p><h2>Kurze Pause?</h2><button id="resume-button" class="button button--primary">WEITER</button><button id="restart-pause-button" class="button button--ghost">AM CHECKPOINT NEU</button><button id="menu-pause-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
+  <section id="pause-screen" class="screen panel-screen"><div class="panel"><p class="eyebrow">EINSATZ PAUSIERT</p><h2>Kurze Pause?</h2><button id="resume-button" class="button button--primary">WEITER</button><button id="restart-pause-button" class="button button--ghost">AM CHECKPOINT NEU</button><button id="rotate-reset-button" class="button button--text">ANSICHT DREHEN</button><button id="menu-pause-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
   <section id="win-screen" class="screen win-screen"><div class="panel result"><p class="eyebrow">FSA-X ERREICHT</p><h2>Nachtschicht<br>gemeistert.</h2><div class="final-score"><small>EINSATZWERTUNG</small><strong id="final-score">000000</strong><em id="new-best">NEUER BESTWERT</em></div><div class="result-grid"><div><small>ZEIT</small><b id="final-time">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="final-deaths">0</b></div><div><small>KLEMMBÄNDER</small><b id="final-bands">0 / 12</b></div></div><button id="restart-button" class="button button--primary">NOCH EINE SCHICHT <b>→</b></button><button id="menu-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
 
-  <div class="touch-controls"><button id="touch-left">←</button><button id="touch-right">→</button><button id="touch-jump">SPRUNG</button></div>
+  <div id="touch-layer" class="touch-layer" aria-hidden="true">
+    <div id="touch-left" class="touch-zone touch-zone--left"><i class="pad">←</i></div>
+    <div id="touch-right" class="touch-zone touch-zone--right"><i class="pad">→</i></div>
+    <div id="touch-jump" class="touch-zone touch-zone--jump"><i class="pad">SPRUNG</i></div>
+  </div>
+  <section id="rotate-hint" class="rotate-hint"><div>
+    <span class="rotate-hint__icon">▭</span>
+    <h2>BITTE QUER HALTEN</h2>
+    <p>Die Nachtschicht läuft im Querformat. Wenn sich das Bild nicht dreht, ist die Displaysperre deines Geräts aktiv.</p>
+    <p class="rotate-hint__hint">Displaysperre aktiv? Dann dreh das Bild hier — halte das Gerät anschließend quer.</p>
+    <div class="rotate-hint__actions">
+      <button id="rotate-anyway" class="button button--primary">NACH RECHTS ↻</button>
+      <button id="rotate-flip" class="button button--primary">↺ NACH LINKS</button>
+    </div>
+  </div></section>
   <div id="flash" class="flash"></div>
   <footer class="site-footer"><span>© JEREMIAS ABGASTECHNIK GMBH</span><a href="https://jeremias.de/impressum" target="_blank" rel="noopener">IMPRESSUM</a><a href="https://jeremias.de/datenschutz" target="_blank" rel="noopener">DATENSCHUTZ</a></footer>
 </main><script type="module" src="game.js"></script></body></html>

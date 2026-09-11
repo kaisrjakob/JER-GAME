@@ -5,7 +5,8 @@ const defaults = Object.freeze({
   sfx: 0.78,
   muted: false,
   reducedMotion: false,
-  control: 'hybrid'
+  rotate: 'auto',
+  quality: 'auto'
 });
 
 function safeStorage() {
@@ -47,7 +48,8 @@ export function loadSettings() {
       sfx: clampNumber(value.sfx, defaults.sfx),
       muted: Boolean(value.muted),
       reducedMotion: Boolean(value.reducedMotion) || matchMedia('(prefers-reduced-motion: reduce)').matches,
-      control: ['hybrid', 'keyboard', 'pointer'].includes(value.control) ? value.control : defaults.control
+      rotate: ['auto', 'cw', 'ccw'].includes(value.rotate) ? value.rotate : defaults.rotate,
+      quality: ['auto', 'low', 'medium', 'high'].includes(value.quality) ? value.quality : defaults.quality
     };
   } catch {
     return { ...defaults };

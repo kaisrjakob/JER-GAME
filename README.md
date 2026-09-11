@@ -11,7 +11,18 @@ Ein handgebautes Rage-Platformer-Spiel im Stil klassischer „Unfair“-Jump-’
 - **R**: sofort zum letzten Jeremias-Servicepunkt zurückkehren
 - **Escape / P**: Pause
 
-Auf Touch-Geräten stehen große Links-, Rechts- und Sprungtasten bereit. Das Ziel, die Steuerung und die unfairen Spielregeln werden vor jedem Lauf direkt eingeblendet.
+## Auf dem Handy
+
+Das Spiel läuft unter derselben URL im Querformat bildfüllend. Die Spielhöhe ist fix, die sichtbare Breite wächst mit dem Seitenverhältnis bis 20:9 mit – ein 19,5:9-Handy sieht also nicht weniger, sondern etwas mehr als ein 16:9-Desktop.
+
+- Daumen links: **←** und **→**, der Finger darf zwischen beiden gleiten, ohne abzusetzen
+- Daumen rechts: **SPRUNG**, halten für einen höheren Sprung
+- Tippen irgendwo sonst springt ebenfalls
+- Die Trefferflächen sind deutlich größer als die sichtbaren Pads und halten Abstand zu den Bildschirmkanten, damit Wischgesten des Systems nicht auslösen
+
+Im Hochformat erscheint ein Dreh-Hinweis. Wer die Displaysperre aktiv hat, dreht die Ansicht dort per Knopf in die gewünschte Richtung; im Pause-Menü lässt sich das jederzeit wieder ändern.
+
+Die Effektstufe (Schatten, Partikel, Parallax-Ebenen, Pixeldichte) passt sich automatisch an die gemessene Leistung an und lässt sich in den gespeicherten Einstellungen festnageln.
 
 ## Jeremias-Spielwelt
 
@@ -47,7 +58,7 @@ npm run check
 
 ## Technik und Datenschutz
 
-Canvas 2D rendert das Level mit festem Simulationsschritt. Musik und Effekte entstehen lokal über Web Audio. Highscore und Audioeinstellung bleiben im Browser. Es gibt kein Backend, keine Cookies, kein Tracking und keine Übertragung von Spieldaten.
+Canvas 2D rendert das Level mit festem Simulationsschritt in einem 900 Einheiten hohen Koordinatenraum; die Breite ergibt sich zur Laufzeit aus dem Seitenverhältnis. Musik und Effekte entstehen lokal über Web Audio. Highscore und Audioeinstellung bleiben im Browser. Es gibt kein Backend, keine Cookies, kein Tracking und keine Übertragung von Spieldaten.
 
 ## Bildquellen
 
