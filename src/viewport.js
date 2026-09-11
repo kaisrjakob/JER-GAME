@@ -31,6 +31,13 @@ export function cameraTarget(playerX, viewWidth = viewport.width) {
   return Math.max(0, Math.min(LEVEL_END - viewWidth + 500, playerX - viewWidth * 0.2625));
 }
 
+const dprQueries = [];
+
+export function onMediaChange(query, handler) {
+  if (typeof query.addEventListener === 'function') query.addEventListener('change', handler);
+  else if (typeof query.addListener === 'function') query.addListener(handler);
+}
+
 export function observeViewport(element, onChange) {
   let pending = 0;
   const schedule = () => {
@@ -38,12 +45,16 @@ export function observeViewport(element, onChange) {
     pending = requestAnimationFrame(onChange);
   };
   if (typeof ResizeObserver === 'function') new ResizeObserver(schedule).observe(element);
-  else addEventListener('resize', schedule);
+  addEventListener('resize', schedule);
+  addEventListener('orientationchange', schedule);
   addEventListener('pageshow', schedule);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(); });
   const watchDpr = () => {
-    const query = matchMedia('(resolution: ' + devicePixelRatio + 'dppx)');
-    query.addEventListener('change', () => { watchDpr(); schedule(); }, { once: true });
+    try {
+      const query = matchMedia('(resolution: ' + devicePixelRatio + 'dppx)');
+      dprQueries.push(query);
+      onMediaChange(query, () => { watchDpr(); schedule(); });
+    } catch { /* aeltere Engines kennen die resolution-Query nicht */ }
   };
   watchDpr();
   return schedule;

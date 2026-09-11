@@ -8,7 +8,7 @@ import { QualityMonitor } from './quality.js';
 import { loadHighScore, loadSettings, saveHighScore, saveSettings } from './storage.js';
 import { TouchControls } from './touch.js';
 import { activeTrapBox, createLevel, overlaps } from './track.js';
-import { cameraTarget } from './viewport.js';
+import { cameraTarget, onMediaChange } from './viewport.js';
 
 const STEP = 1 / 120;
 export class UnfairJeremias {
@@ -59,9 +59,10 @@ export class UnfairJeremias {
 
   async boot() {
     this.bindUi();
+    this.applyInputMode();
     this.applyRotation();
     this.ui.menuHighscore.textContent = formatScore(this.bestScore);
-    this.ui.audioButton.textContent = this.settings.muted ? '×' : '♫';
+    this.ui.audioButton.classList.toggle('muted', this.settings.muted);
     try {
       await this.renderer.load((progress) => {
         this.ui.loadingProgress.style.width = Math.round(progress * 100) + '%';
@@ -76,11 +77,38 @@ export class UnfairJeremias {
     requestAnimationFrame((time) => this.frame(time));
   }
 
+  applyInputMode() {
+    const coarse = matchMedia('(pointer: coarse)');
+    const noHover = matchMedia('(hover: none)');
+    const decide = () => {
+      const touch = coarse.matches || noHover.matches || navigator.maxTouchPoints > 0;
+      this.setInputMode(touch ? 'touch' : 'keyboard');
+    };
+    onMediaChange(coarse, decide);
+    onMediaChange(noHover, decide);
+    decide();
+    addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'mouse') this.setInputMode('touch');
+    }, { capture: true });
+    addEventListener('keydown', (event) => {
+      if (!event.metaKey && !event.ctrlKey && navigator.maxTouchPoints === 0) this.setInputMode('keyboard');
+    }, { capture: true });
+  }
+
+  setInputMode(mode) {
+    const root = document.documentElement.classList;
+    if (root.contains(mode)) return;
+    root.toggle('touch', mode === 'touch');
+    root.toggle('keyboard', mode === 'keyboard');
+  }
+
   async loadCanvasFonts() {
     if (!document.fonts) return;
     const faces = ['700 15px "Barlow Condensed"', '800 22px "Barlow Condensed"'];
+    const loaded = Promise.all(faces.map((face) => document.fonts.load(face)));
+    const deadline = new Promise((resolve) => setTimeout(resolve, 1500));
     try {
-      await Promise.all(faces.map((face) => document.fonts.load(face)));
+      await Promise.race([loaded, deadline]);
     } catch { /* Canvas faellt auf die Systemschrift zurueck */ }
   }
 
@@ -101,7 +129,7 @@ export class UnfairJeremias {
     this.ui.menuButton.addEventListener('click', () => this.toMenu());
     this.ui.audioButton.addEventListener('click', () => {
       const muted = this.audio.toggleMute();
-      this.ui.audioButton.textContent = muted ? '×' : '♫';
+      this.ui.audioButton.classList.toggle('muted', muted);
       saveSettings(this.settings);
     });
     this.ui.rotateAnyway.addEventListener('click', () => this.setRotation('cw'));

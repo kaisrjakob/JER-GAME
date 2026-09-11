@@ -16,6 +16,9 @@ export class TouchControls {
     addEventListener('pointercancel', (event) => this.onUp(event));
     addEventListener('blur', () => this.releaseAll());
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.releaseAll(); });
+    // Beim ersten Kontakt klappt die Browserleiste ein und verschiebt die Zonen mitten in der Geste
+    for (const name of ['resize', 'orientationchange', 'scroll']) addEventListener(name, () => this.measure());
+    if (typeof ResizeObserver === 'function') new ResizeObserver(() => this.measure()).observe(layer);
   }
 
   measure() {
@@ -25,6 +28,7 @@ export class TouchControls {
   zoneAt(x, y) {
     for (const name of ZONES) {
       const rect = this.rects[name];
+      if (!rect || !rect.width) continue;
       if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return name;
     }
     return null;
@@ -72,16 +76,10 @@ export class TouchControls {
   }
 
   apply() {
-    let left = false;
-    let right = false;
-    for (const zone of this.pointers.values()) {
-      if (zone === 'left') left = true;
-      else if (zone === 'right') right = true;
-    }
-    this.input.touchLeft = left;
-    this.input.touchRight = right;
-    for (const name of ZONES) {
-      this.zones[name].classList.toggle('touch-zone--held', [...this.pointers.values()].includes(name));
-    }
+    const held = { left: false, right: false, jump: false };
+    for (const zone of this.pointers.values()) if (zone) held[zone] = true;
+    this.input.touchLeft = held.left;
+    this.input.touchRight = held.right;
+    for (const name of ZONES) this.zones[name].classList.toggle('touch-zone--held', held[name]);
   }
 }
