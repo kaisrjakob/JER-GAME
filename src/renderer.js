@@ -1,7 +1,9 @@
 import {
   GAME_ASSETS, LEVEL_END, PLAYER_HEIGHT, PLAYER_WIDTH, SECTIONS, VIEW_HEIGHT,
-  VIEW_WIDTH, sectionIndexForX
+  sectionIndexForX
 } from './config.js';
+import { observeViewport, updateViewport, viewport } from './viewport.js';
+import { QUALITY } from './quality.js';
 
 export class UnfairRenderer {
   constructor(canvas, settings) {
@@ -18,27 +20,34 @@ export class UnfairRenderer {
     this.width = 1;
     this.height = 1;
     this.dpr = 1;
-    addEventListener('resize', () => this.resize());
+    this.viewWidth = viewport.width;
+    this.vignette = null;
+    this.vignetteKey = 0;
+    observeViewport(canvas, () => this.resize());
     this.resize();
   }
 
   async load(progress = () => {}) {
     const sources = [
       ...SECTIONS.map((section) => section.asset), 'assets/jeremias-logo.png',
-      GAME_ASSETS.clampBand, GAME_ASSETS.dwPipe, GAME_ASSETS.rainCap,
-      'assets/game/ChatGPT Image 22. Juli 2026, 22_30_51.png'
+      GAME_ASSETS.clampBand, GAME_ASSETS.dwPipe, GAME_ASSETS.rainCap, GAME_ASSETS.player
     ];
+    const unique = [...new Set(sources)];
     let loaded = 0;
-    const images = await Promise.all(sources.map((source) => new Promise((resolve, reject) => {
+    const decoded = new Map();
+    await Promise.all(unique.map((source) => new Promise((resolve, reject) => {
       const image = new Image();
+      image.decoding = 'async';
       image.onload = () => {
+        decoded.set(source, image);
         loaded += 1;
-        progress(loaded / sources.length);
-        resolve(image);
+        progress(loaded / unique.length);
+        resolve();
       };
-      image.onerror = reject;
+      image.onerror = () => reject(new Error('Asset konnte nicht geladen werden: ' + source));
       image.src = source;
     })));
+    const images = sources.map((source) => decoded.get(source));
     const sectionCount = SECTIONS.length;
     this.images = images.slice(0, sectionCount);
     this.logo = images[sectionCount];
@@ -51,9 +60,34 @@ export class UnfairRenderer {
   resize() {
     this.width = Math.max(1, this.canvas.clientWidth);
     this.height = Math.max(1, this.canvas.clientHeight);
-    this.dpr = Math.min(2, devicePixelRatio || 1);
-    this.canvas.width = Math.round(this.width * this.dpr);
-    this.canvas.height = Math.round(this.height * this.dpr);
+    this.dpr = Math.min(QUALITY.dprCap, devicePixelRatio || 1);
+    updateViewport(this.width, this.height, this.dpr);
+    this.viewWidth = viewport.width;
+    const root = document.documentElement.classList;
+    root.toggle('short', this.height < 650);
+    root.toggle('compact', this.height < 460);
+    const backingWidth = Math.round(this.width * this.dpr);
+    const backingHeight = Math.round(this.height * this.dpr);
+    if (this.canvas.width === backingWidth && this.canvas.height === backingHeight) return;
+    this.canvas.width = backingWidth;
+    this.canvas.height = backingHeight;
+    this.vignette = null;
+  }
+
+  shadow(color, blur) {
+    if (!QUALITY.shadows) return;
+    this.ctx.shadowColor = color;
+    this.ctx.shadowBlur = blur;
+  }
+
+  clearShadow() {
+    this.ctx.shadowColor = 'transparent';
+    this.ctx.shadowBlur = 0;
+  }
+
+  applyQuality() {
+    this.vignette = null;
+    this.resize();
   }
 
   render(state, time) {
@@ -62,10 +96,13 @@ export class UnfairRenderer {
     ctx.fillStyle = '#020814';
     ctx.fillRect(0, 0, this.width, this.height);
     this.drawBackdrop(state);
-    const scale = Math.min(this.width / VIEW_WIDTH, this.height / VIEW_HEIGHT);
-    const offsetX = (this.width - VIEW_WIDTH * scale) * 0.5;
-    const offsetY = (this.height - VIEW_HEIGHT * scale) * 0.5;
+    this.viewWidth = viewport.width;
+    const { scale, offsetX, offsetY } = viewport;
     ctx.setTransform(this.dpr * scale, 0, 0, this.dpr * scale, offsetX * this.dpr, offsetY * this.dpr);
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, this.viewWidth, VIEW_HEIGHT);
+    ctx.clip();
     this.drawParallax(state);
     this.drawPlatforms(state, time);
     this.drawCheckpoints(state, time);
@@ -77,16 +114,33 @@ export class UnfairRenderer {
     this.drawPlayer(state, time);
     this.drawSoot(state);
     this.drawVignette();
+    ctx.restore();
+    this.drawLetterbox(offsetX, offsetY);
+  }
+
+  drawLetterbox(offsetX, offsetY) {
+    if (offsetX < .5 && offsetY < .5) return;
+    const ctx = this.ctx;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.fillStyle = '#020814';
+    if (offsetY >= .5) {
+      ctx.fillRect(0, 0, this.width, Math.ceil(offsetY));
+      ctx.fillRect(0, this.height - Math.ceil(offsetY), this.width, Math.ceil(offsetY) + 1);
+    }
+    if (offsetX >= .5) {
+      ctx.fillRect(0, 0, Math.ceil(offsetX), this.height);
+      ctx.fillRect(this.width - Math.ceil(offsetX), 0, Math.ceil(offsetX) + 1, this.height);
+    }
   }
 
   drawBackdrop(state) {
     const ctx = this.ctx;
     const index = sectionIndexForX(state.player.x);
     const image = this.images[index];
-    const scale = Math.max(this.width / image.width, this.height / image.height);
+    const scale = Math.max(this.width / image.width, this.height / image.height) * 1.08;
     const width = image.width * scale;
     const height = image.height * scale;
-    const parallax = this.settings.reducedMotion ? 0 : -(state.cameraX * 0.025) % 100;
+    const parallax = this.settings.reducedMotion ? 0 : -(state.cameraX * 0.025) % 100 + 50;
     ctx.drawImage(image, (this.width - width) / 2 + parallax, (this.height - height) / 2, width, height);
     if (SECTIONS[index].tint) {
       ctx.fillStyle = SECTIONS[index].tint;
@@ -106,13 +160,14 @@ export class UnfairRenderer {
 
   drawParallax(state) {
     const ctx = this.ctx;
-    for (let layer = 0; layer < 3; layer += 1) {
+    const segments = Math.ceil((this.viewWidth + 290) / 145) + 1;
+    for (let layer = 0; layer < QUALITY.parallaxLayers; layer += 1) {
       const base = 535 + layer * 55;
       const speed = .08 + layer * .07;
       ctx.fillStyle = 'rgba(' + (10 + layer * 8) + ',' + (29 + layer * 11) + ',' + (49 + layer * 17) + ',' + (.78 - layer * .16) + ')';
       ctx.beginPath();
       ctx.moveTo(0, VIEW_HEIGHT);
-      for (let i = -2; i < 15; i += 1) {
+      for (let i = -2; i < segments; i += 1) {
         const x = i * 145 - (state.cameraX * speed) % 145;
         const h = 70 + ((i * 61 + layer * 43) % 150);
         ctx.lineTo(x, base - h);
@@ -129,7 +184,7 @@ export class UnfairRenderer {
     for (const platform of state.level.platforms) {
       const x = this.worldX(platform.x, state);
       const y = platform.y + platform.fallY;
-      if (x > VIEW_WIDTH + 100 || x + platform.width < -100 || y > VIEW_HEIGHT + 150) continue;
+      if (x > this.viewWidth + 100 || x + platform.width < -100 || y > VIEW_HEIGHT + 150) continue;
       const section = SECTIONS[platform.section];
       const body = ctx.createLinearGradient(0, y, 0, VIEW_HEIGHT);
       body.addColorStop(0, '#1d3449');
@@ -186,15 +241,14 @@ export class UnfairRenderer {
     for (const band of state.level.bands) {
       if (band.collected) continue;
       const x = this.worldX(band.x, state);
-      if (x < -70 || x > VIEW_WIDTH + 70) continue;
+      if (x < -70 || x > this.viewWidth + 70) continue;
       const y = band.y;
       ctx.save();
       ctx.translate(x, y);
       ctx.rotate(Math.sin(time * .003 + band.baseX) * .08);
-      ctx.shadowColor = '#ff7a1a';
-      ctx.shadowBlur = 18;
+      this.shadow('#ff7a1a', 18);
       ctx.drawImage(this.clampBand, -46, -30, 92, 60);
-      ctx.shadowBlur = 0;
+      this.clearShadow();
       ctx.fillStyle = 'rgba(255,126,28,.85)';
       ctx.beginPath(); ctx.arc(0, 1, 4, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
@@ -205,7 +259,7 @@ export class UnfairRenderer {
     const ctx = this.ctx;
     for (const checkpoint of state.level.checkpoints) {
       const x = this.worldX(checkpoint.x, state);
-      if (x < -150 || x > VIEW_WIDTH + 150) continue;
+      if (x < -150 || x > this.viewWidth + 150) continue;
       ctx.strokeStyle = checkpoint.active ? '#43e39a' : '#0d83d5';
       ctx.lineWidth = 8;
       ctx.beginPath();
@@ -243,7 +297,7 @@ export class UnfairRenderer {
     }
     const ctx = this.ctx;
     const fakeX = this.worldX(6070, state);
-    if (fakeX > -200 && fakeX < VIEW_WIDTH + 200) {
+    if (fakeX > -200 && fakeX < this.viewWidth + 200) {
       ctx.fillStyle = '#f5f7f8';
       ctx.fillRect(fakeX, 505, 9, 165);
       ctx.fillStyle = '#ff7a1a';
@@ -257,7 +311,7 @@ export class UnfairRenderer {
   drawSpikes(trap, state) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -200 || x > VIEW_WIDTH + 200 || trap.progress <= 0) return;
+    if (x < -200 || x > this.viewWidth + 200 || trap.progress <= 0) return;
     const height = trap.height * trap.progress;
     const count = Math.ceil(trap.width / 30);
     ctx.fillStyle = '#cfdce3';
@@ -279,7 +333,7 @@ export class UnfairRenderer {
     if (trap.cleared) return;
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -180 || x > VIEW_WIDTH + 180) return;
+    if (x < -180 || x > this.viewWidth + 180) return;
     if (!trap.triggered) return;
     const housingY = trap.startY - 28;
     ctx.fillStyle = '#172b3d';
@@ -289,8 +343,7 @@ export class UnfairRenderer {
     ctx.fillStyle = '#ff7a1a';
     for (let stripe = x - 10; stripe < x + trap.width + 8; stripe += 22) ctx.fillRect(stripe, housingY + 18, 11, 5);
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,.65)';
-    ctx.shadowBlur = 10;
+    this.shadow('rgba(0,0,0,.65)', 10);
     ctx.drawImage(this.dwPipe, x - 7, trap.y - 5, trap.width + 14, trap.height + 10);
     ctx.restore();
   }
@@ -299,12 +352,11 @@ export class UnfairRenderer {
     if (trap.cleared) return;
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -180 || x > VIEW_WIDTH + 180) return;
+    if (x < -180 || x > this.viewWidth + 180) return;
     ctx.save();
     ctx.translate(x + trap.width / 2, trap.y + trap.height / 2);
     ctx.rotate(trap.angle);
-    ctx.shadowColor = 'rgba(0,0,0,.6)';
-    ctx.shadowBlur = 12;
+    this.shadow('rgba(0,0,0,.6)', 12);
     ctx.drawImage(this.rainCap, -trap.width / 2, -trap.height / 2, trap.width, trap.height);
     ctx.restore();
     if (trap.phase === 'idle') {
@@ -317,10 +369,9 @@ export class UnfairRenderer {
     if (!trap.revealed) return;
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -120 || x > VIEW_WIDTH + 120) return;
+    if (x < -120 || x > this.viewWidth + 120) return;
     ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,.55)';
-    ctx.shadowBlur = 9;
+    this.shadow('rgba(0,0,0,.55)', 9);
     ctx.drawImage(this.dwPipe, x - 4, trap.y - 4, trap.width + 8, trap.height + 8);
     ctx.restore();
     ctx.strokeStyle = 'rgba(159,184,200,.7)';
@@ -331,7 +382,7 @@ export class UnfairRenderer {
   drawFakeCheckpoint(trap, state, time) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -150 || x > VIEW_WIDTH + 150) return;
+    if (x < -150 || x > this.viewWidth + 150) return;
     const baseY = trap.y;
     ctx.strokeStyle = trap.exposed ? '#e6483d' : '#0d83d5';
     ctx.lineWidth = 8;
@@ -368,7 +419,7 @@ export class UnfairRenderer {
     for (const trap of state.level.traps) {
       if (trap.type !== 'finaleCap') continue;
       const x = this.worldX(trap.x, state);
-      if (x < -260 || x > VIEW_WIDTH + 260) continue;
+      if (x < -260 || x > this.viewWidth + 260) continue;
       ctx.save();
       if (trap.phase === 'toppled') {
         ctx.translate(x + trap.width + 46, trap.floorY - 34);
@@ -378,8 +429,7 @@ export class UnfairRenderer {
       } else {
         ctx.translate(x + trap.width / 2, trap.y + trap.height / 2);
         ctx.rotate(trap.angle);
-        ctx.shadowColor = 'rgba(0,0,0,.6)';
-        ctx.shadowBlur = 14;
+        this.shadow('rgba(0,0,0,.6)', 14);
         ctx.drawImage(this.rainCap, -trap.width / 2, -trap.height / 2, trap.width, trap.height);
       }
       ctx.restore();
@@ -389,7 +439,7 @@ export class UnfairRenderer {
   drawPressure(trap, state, time) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -260 || x > VIEW_WIDTH + 260) return;
+    if (x < -260 || x > this.viewWidth + 260) return;
     ctx.fillStyle = '#5c7487';
     ctx.fillRect(x, trap.y - 95, 56, 95);
     ctx.fillStyle = '#d9e5ea';
@@ -418,7 +468,7 @@ export class UnfairRenderer {
     if (!trap.active) return;
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x + trap.width < -100 || x > VIEW_WIDTH + 100) return;
+    if (x + trap.width < -100 || x > this.viewWidth + 100) return;
     ctx.save();
     ctx.strokeStyle = 'rgba(190,224,248,.5)';
     ctx.lineWidth = 3;
@@ -441,7 +491,7 @@ export class UnfairRenderer {
   drawDripper(trap, state, time) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -100 || x > VIEW_WIDTH + 100) return;
+    if (x < -100 || x > this.viewWidth + 100) return;
     ctx.fillStyle = '#42586a';
     ctx.fillRect(x - 8, trap.outletY - 46, trap.width + 16, 46);
     ctx.fillStyle = '#243a4c';
@@ -452,12 +502,11 @@ export class UnfairRenderer {
     ctx.fill();
     if (trap.dropActive) {
       ctx.fillStyle = '#8fe08a';
-      ctx.shadowColor = '#8fe08a';
-      ctx.shadowBlur = 12;
+      this.shadow('#8fe08a', 12);
       ctx.beginPath();
       ctx.ellipse(x + 13, trap.dropY + 17, 9, 17, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
+      this.clearShadow();
     }
     ctx.fillStyle = 'rgba(120,200,120,.3)';
     ctx.beginPath();
@@ -468,7 +517,7 @@ export class UnfairRenderer {
   drawFan(trap, state) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -200 || x > VIEW_WIDTH + 200) return;
+    if (x < -200 || x > this.viewWidth + 200) return;
     const cx = x + trap.thickness / 2;
     
     ctx.fillStyle = '#1a4a67';
@@ -497,13 +546,12 @@ export class UnfairRenderer {
     
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#0d83d5';
-    ctx.shadowColor = 'rgba(13, 131, 213, 0.5)';
-    ctx.shadowBlur = 8;
+    this.shadow('rgba(13, 131, 213, 0.5)', 8);
     ctx.beginPath();
     ctx.arc(0, 0, 12, 0, Math.PI * 2);
     ctx.fill();
     
-    ctx.shadowColor = 'transparent';
+    this.clearShadow();
     ctx.fillStyle = '#1a5a8f';
     ctx.beginPath();
     ctx.arc(0, 0, 6, 0, Math.PI * 2);
@@ -518,7 +566,7 @@ export class UnfairRenderer {
   drawSteamVent(trap, state, time) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -150 || x > VIEW_WIDTH + 150) return;
+    if (x < -150 || x > this.viewWidth + 150) return;
     ctx.fillStyle = '#42586a';
     ctx.fillRect(x - 6, trap.floorY - 16, trap.width + 12, 16);
     ctx.fillStyle = '#ff7a1a';
@@ -545,7 +593,7 @@ export class UnfairRenderer {
   drawCrusher(trap, state) {
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -220 || x > VIEW_WIDTH + 220) return;
+    if (x < -220 || x > this.viewWidth + 220) return;
     ctx.fillStyle = '#17364e';
     ctx.fillRect(x - 20, trap.raisedY - 60, 16, trap.floorY - trap.raisedY + 60);
     ctx.fillRect(x + trap.width + 4, trap.raisedY - 60, 16, trap.floorY - trap.raisedY + 60);
@@ -571,14 +619,13 @@ export class UnfairRenderer {
     if (trap.sprung) return;
     const ctx = this.ctx;
     const x = this.worldX(trap.x, state);
-    if (x < -70 || x > VIEW_WIDTH + 70) return;
+    if (x < -70 || x > this.viewWidth + 70) return;
     ctx.save();
     ctx.translate(x, trap.y);
     ctx.rotate(.25 + Math.sin(time * .003 + trap.x) * .08);
-    ctx.shadowColor = '#e6483d';
-    ctx.shadowBlur = 18;
+    this.shadow('#e6483d', 18);
     ctx.drawImage(this.clampBand, -46, -30, 92, 60);
-    ctx.shadowBlur = 0;
+    this.clearShadow();
     ctx.fillStyle = 'rgba(230,72,61,.85)';
     ctx.beginPath(); ctx.arc(0, 1, 4, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
@@ -604,13 +651,13 @@ export class UnfairRenderer {
     gradient.addColorStop(.35, 'rgba(2,4,10,0)');
     gradient.addColorStop(1, 'rgba(2,4,10,' + (.93 * penetration) + ')');
     ctx.fillStyle = gradient;
-    ctx.fillRect(-100, -100, VIEW_WIDTH + 200, VIEW_HEIGHT + 200);
+    ctx.fillRect(-100, -100, this.viewWidth + 200, VIEW_HEIGHT + 200);
   }
 
   drawFinish(state, time) {
     const ctx = this.ctx;
     const x = this.worldX(state.level.finish.x, state);
-    if (x < -300 || x > VIEW_WIDTH + 400) return;
+    if (x < -300 || x > this.viewWidth + 400) return;
     const y = state.level.finish.y;
     const width = 135;
     const tower = ctx.createLinearGradient(x, 0, x + width, 0);
@@ -639,6 +686,7 @@ export class UnfairRenderer {
     ctx.font = '800 22px "Barlow Condensed",sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('ECHTES ZIEL // FSA-X', x + width / 2, y - 545);
+    ctx.textAlign = 'left';
   }
 
   drawPlayer(state, time) {
@@ -679,8 +727,9 @@ export class UnfairRenderer {
   }
 
   emit(x, y, color, count = 18) {
-    if (this.settings.reducedMotion) return;
-    for (let i = 0; i < count; i += 1) this.particles.push({
+    if (this.settings.reducedMotion || this.particles.length > 220) return;
+    const budget = Math.round(count * QUALITY.particles);
+    for (let i = 0; i < budget; i += 1) this.particles.push({
       x, y, color,
       vx: (Math.random() - .5) * 270,
       vy: -90 - Math.random() * 280,
@@ -706,15 +755,19 @@ export class UnfairRenderer {
 
   drawVignette() {
     const ctx = this.ctx;
-    const gradient = ctx.createRadialGradient(VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 300, VIEW_WIDTH / 2, VIEW_HEIGHT / 2, 900);
-    gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,3,10,.48)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    if (!this.vignette || this.vignetteKey !== this.viewWidth) {
+      const outer = Math.hypot(this.viewWidth, VIEW_HEIGHT) * .49;
+      const gradient = ctx.createRadialGradient(
+        this.viewWidth / 2, VIEW_HEIGHT / 2, outer / 3,
+        this.viewWidth / 2, VIEW_HEIGHT / 2, outer
+      );
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(1, 'rgba(0,3,10,.48)');
+      this.vignette = gradient;
+      this.vignetteKey = this.viewWidth;
+    }
+    ctx.fillStyle = this.vignette;
+    ctx.fillRect(0, 0, this.viewWidth, VIEW_HEIGHT);
   }
 }
 
-function roundRect(ctx, x, y, width, height, radius) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, width, height, radius);
-}
