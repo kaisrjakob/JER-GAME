@@ -2,9 +2,9 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#05142a"><meta name="description" content="UNFAIR JEREMIAS – die gemeinste Nachtschicht der Abgastechnik.">
+  <meta name="theme-color" content="#06162c"><meta name="description" content="UNFAIR JEREMIAS – die gemeinste Nachtschicht der Abgastechnik.">
   <title>UNFAIR JEREMIAS // NACHTSCHICHT</title>
-  <link rel="icon" href="assets/reference-industry.png"><link rel="preload" href="assets/world-industry.jpg" as="image"><link rel="stylesheet" href="style.css">
+  <link rel="icon" href="assets/favicon-32.png" sizes="32x32"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Unfair Jeremias"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><link rel="preload" href="assets/world-industry.jpg" as="image"><link rel="stylesheet" href="style.css">
 </head>
 <body><main id="app">
   <canvas id="game-canvas" aria-label="Unfair Jeremias Spielfläche"></canvas>
@@ -20,6 +20,7 @@
       <div class="mission-rule taps"><div><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 7 12l7 7"/></svg></kbd><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></kbd><b>LAUFEN</b></div><div><kbd>SPRUNG</kbd><b>SPRINGEN</b></div></div>
       <div class="hero__actions"><button id="start-button" class="button button--primary">NACHTSCHICHT STARTEN <b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></b></button><button id="how-button" class="button button--ghost">WAS MUSS ICH TUN?</button></div>
       <div class="best"><span>BESTER EINSATZ</span><strong id="menu-highscore">000000</strong></div>
+      <div id="install-bar" class="install-bar"><p id="install-text">Als App auf den Homescreen legen — startet im Vollbild und läuft offline.</p><button id="install-button" class="button button--ghost">AUF DEN HOMESCREEN</button><button id="install-dismiss" class="button button--text" aria-label="Hinweis ausblenden">SPÄTER</button></div>
     </div>
     <div class="system-route"><span>DW-FU</span><i></i><span>DW-VISION</span><i></i><span>FSA-X</span><i></i><span>STURMTRASSE</span><i></i><span>PRÜFSTAND</span></div>
   </section>
@@ -64,6 +65,7 @@
       <button id="rotate-flip" class="button button--primary"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v6h6"/><path d="M4 11a8 8 0 1 1 2.3 5.3"/></svg>NACH LINKS</button>
     </div>
   </div></section>
+  <div id="update-bar" class="update-bar"><span>Neue Version verfügbar.</span><button id="update-button" class="button button--primary">JETZT LADEN</button></div>
   <div id="flash" class="flash"></div>
   <footer class="site-footer"><span>© JEREMIAS ABGASTECHNIK GMBH</span><a href="https://jeremias.de/impressum" target="_blank" rel="noopener">IMPRESSUM</a><a href="https://jeremias.de/datenschutz" target="_blank" rel="noopener">DATENSCHUTZ</a></footer>
 </main><script type="module" src="game.js"></script></body></html>

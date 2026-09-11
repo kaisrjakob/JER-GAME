@@ -1,0 +1,19 @@
+{
+  "id": "/JER-GAME/",
+  "name": "Unfair Jeremias // Nachtschicht",
+  "short_name": "Unfair Jeremias",
+  "description": "Die gemeinste Nachtschicht der Jeremias-Abgastechnik. Erreiche den FSA-X-Turm.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#06162c",
+  "theme_color": "#06162c",
+  "categories": ["games"],
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "assets/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
