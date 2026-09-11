@@ -17,52 +17,51 @@
       <h1><em>UNFAIR</em><span>JEREMIAS</span>NACHTSCHICHT</h1>
       <p class="hero__copy">Erreiche den großen FSA-X-Industrieschornstein hinter dem Prüfstand. Vertraue keinem Klemmband, keiner Montagebühne, keinem Zielschild — und ab der Sturmtrasse nicht einmal mehr dem Wetter.</p>
       <div class="mission-rule keys"><div><kbd>A</kbd><kbd>D</kbd><b>LAUFEN</b></div><div><kbd>SPACE</kbd><b>SPRINGEN</b></div><div><kbd>R</kbd><b>CHECKPOINT</b></div></div>
-      <div class="mission-rule taps"><div><kbd>←</kbd><kbd>→</kbd><b>LAUFEN</b></div><div><kbd>SPRUNG</kbd><b>SPRINGEN</b></div></div>
-      <div class="hero__actions"><button id="start-button" class="button button--primary">NACHTSCHICHT STARTEN <b>→</b></button><button id="how-button" class="button button--ghost">WAS MUSS ICH TUN?</button></div>
+      <div class="mission-rule taps"><div><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 7 12l7 7"/></svg></kbd><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></kbd><b>LAUFEN</b></div><div><kbd>SPRUNG</kbd><b>SPRINGEN</b></div></div>
+      <div class="hero__actions"><button id="start-button" class="button button--primary">NACHTSCHICHT STARTEN <b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></b></button><button id="how-button" class="button button--ghost">WAS MUSS ICH TUN?</button></div>
       <div class="best"><span>BESTER EINSATZ</span><strong id="menu-highscore">000000</strong></div>
     </div>
     <div class="system-route"><span>DW-FU</span><i></i><span>DW-VISION</span><i></i><span>FSA-X</span><i></i><span>STURMTRASSE</span><i></i><span>PRÜFSTAND</span></div>
   </section>
 
-  <section id="how-screen" class="screen panel-screen"><div class="panel panel--wide"><button class="close" data-close="how-screen" aria-label="Schließen">×</button><p class="eyebrow">EINSATZBESPRECHUNG</p><h2>Ein Ziel. Viele Fallen.</h2>
+  <section id="how-screen" class="screen panel-screen"><div class="panel panel--wide"><button class="close" data-close="how-screen" aria-label="Schließen">×</button><div class="panel__scroll"><p class="eyebrow">EINSATZBESPRECHUNG</p><h2>Ein Ziel. Viele Fallen.</h2>
     <div class="briefing">
       <article><span class="briefing__number">01</span><h3>FSA-X erreichen</h3><p>Laufe nach rechts bis zum echten Jeremias-Industrieschornstein.</p></article>
       <article><span class="briefing__number">02</span><h3>Nichts glauben</h3><p>Kaminhauben, DW-Elemente, Prüföffnungen und Plattformen können Fallen sein. Auf dem Winterdach schieben Böen und Glatteis, im Prüfstand takten Pressen und Ventilatoren — und nicht jedes Klemmband ist ein Original.</p></article>
       <article><span class="briefing__number">03</span><h3>Stellen lernen</h3><p>Nach jedem Tod startest du am letzten blauen Jeremias-Servicepunkt.</p></article>
     </div>
-    <div class="controls keys"><span><kbd>A</kbd><kbd>←</kbd> LINKS</span><span><kbd>D</kbd><kbd>→</kbd> RECHTS</span><span><kbd>SPACE</kbd> SPRINGEN</span><span><kbd>R</kbd> NEU</span></div>
-    <div class="controls taps"><span>Daumen links: <kbd>←</kbd><kbd>→</kbd></span><span>Daumen rechts: <kbd>SPRUNG</kbd></span><span>Tippen irgendwo: SPRINGEN</span></div>
+    <div class="controls keys"><span><kbd>A</kbd><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 7 12l7 7"/></svg></kbd> LINKS</span><span><kbd>D</kbd><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></kbd> RECHTS</span><span><kbd>SPACE</kbd> SPRINGEN</span><span><kbd>R</kbd> NEU</span></div>
+    <div class="controls taps"><span>Daumen links: <kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 7 12l7 7"/></svg></kbd><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></kbd></span><span>Daumen rechts: <kbd>SPRUNG</kbd></span><span>Tippen irgendwo: SPRINGEN</span></div></div>
     <button class="button button--primary" data-close="how-screen">VERSTANDEN</button>
   </div></section>
 
   <section id="hud" class="hud">
     <div class="hud__brand"><img src="assets/jeremias-logo.png" alt=""><span id="hud-section">DW-FU // ABSCHNITT 01</span></div>
-    <div class="objective"><small>DEIN ZIEL</small><strong>ERREICHE DEN FSA-X-TURM →</strong></div>
-    <div class="hud__stats"><div><small>ZEIT</small><b id="timer">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="death-count">00</b></div><div><small>KLEMMBÄNDER</small><b id="band-count">0 / 12</b></div><button id="audio-button" class="hud-button" aria-label="Audio">♫</button><button id="pause-button" class="hud-button" aria-label="Pause">Ⅱ</button></div>
+    <div class="objective"><small>DEIN ZIEL</small><strong>ERREICHE DEN FSA-X-TURM <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></strong></div>
+    <div class="hud__stats"><div><small>ZEIT</small><b id="timer">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="death-count">00</b></div><div><small>KLEMMBÄNDER</small><b id="band-count">0 / 12</b></div><button id="audio-button" class="hud-button" aria-label="Audio"><svg class="ico ico--on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></svg><svg class="ico ico--off" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9.5l5 5M22 9.5l-5 5"/></svg></button><button id="pause-button" class="hud-button" aria-label="Pause"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg></button></div>
     <div class="progress"><i id="campaign-progress"></i><span>START</span><span>DW-FU</span><span>DW-VISION</span><span>FSA-X</span><span>STURM</span><span>PRÜFSTAND</span></div>
   </section>
 
-  <section id="ready-overlay" class="ready-overlay"><div class="ready-card"><p>DEIN AUFTRAG</p><h2>ERREICHE DEN<br><b>FSA-X-TURM</b></h2><div class="keys"><kbd>A</kbd><kbd>D</kbd><span>LAUFEN</span><kbd>SPACE</kbd><span>SPRINGEN</span></div><div class="taps"><kbd>←</kbd><kbd>→</kbd><span>LAUFEN</span><kbd>SPRUNG</kbd><span>SPRINGEN</span></div><strong class="keys">DRÜCKE LEERTASTE ZUM START</strong><strong class="taps">TIPPEN ZUM START</strong><small>WARNUNG: Das Level spielt unfair. Die Steuerung nicht.</small></div></section>
+  <section id="ready-overlay" class="ready-overlay"><div class="ready-card"><p>DEIN AUFTRAG</p><h2>ERREICHE DEN<br><b>FSA-X-TURM</b></h2><div class="keys"><kbd>A</kbd><kbd>D</kbd><span>LAUFEN</span><kbd>SPACE</kbd><span>SPRINGEN</span></div><div class="taps"><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 7 12l7 7"/></svg></kbd><kbd><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></kbd><span>LAUFEN</span><kbd>SPRUNG</kbd><span>SPRINGEN</span></div><strong class="keys">DRÜCKE LEERTASTE ZUM START</strong><strong class="taps">TIPPEN ZUM START</strong><small>WARNUNG: Das Level spielt unfair. Die Steuerung nicht.</small></div></section>
   <section id="death-overlay" class="death-overlay"><span>×</span><strong id="death-message">JETZT KENNST DU DIE STELLE.</strong></section>
   <section id="section-card" class="section-card"><p id="section-kicker">ABSCHNITT 01</p><h2 id="section-title">DW-FU</h2><span id="section-copy">Klemmbänder und die erste Gemeinheit.</span></section>
   <div id="callout" class="callout">SERVICEPUNKT AKTIV</div>
 
-  <section id="pause-screen" class="screen panel-screen"><div class="panel"><p class="eyebrow">EINSATZ PAUSIERT</p><h2>Kurze Pause?</h2><button id="resume-button" class="button button--primary">WEITER</button><button id="restart-pause-button" class="button button--ghost">AM CHECKPOINT NEU</button><button id="rotate-reset-button" class="button button--text">ANSICHT DREHEN</button><button id="menu-pause-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
-  <section id="win-screen" class="screen win-screen"><div class="panel result"><p class="eyebrow">FSA-X ERREICHT</p><h2>Nachtschicht<br>gemeistert.</h2><div class="final-score"><small>EINSATZWERTUNG</small><strong id="final-score">000000</strong><em id="new-best">NEUER BESTWERT</em></div><div class="result-grid"><div><small>ZEIT</small><b id="final-time">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="final-deaths">0</b></div><div><small>KLEMMBÄNDER</small><b id="final-bands">0 / 12</b></div></div><button id="restart-button" class="button button--primary">NOCH EINE SCHICHT <b>→</b></button><button id="menu-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
+  <section id="pause-screen" class="screen panel-screen"><div class="panel"><div class="panel__scroll"><p class="eyebrow">EINSATZ PAUSIERT</p><h2>Kurze Pause?</h2></div><button id="resume-button" class="button button--primary">WEITER</button><button id="restart-pause-button" class="button button--ghost">AM CHECKPOINT NEU</button><button id="rotate-reset-button" class="button button--text">ANSICHT DREHEN</button><button id="menu-pause-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
+  <section id="win-screen" class="screen win-screen"><div class="panel result"><div class="panel__scroll"><p class="eyebrow">FSA-X ERREICHT</p><h2>Nachtschicht<br>gemeistert.</h2><div class="final-score"><small>EINSATZWERTUNG</small><strong id="final-score">000000</strong><em id="new-best">NEUER BESTWERT</em></div><div class="result-grid"><div><small>ZEIT</small><b id="final-time">00:00.00</b></div><div><small>TODESFÄLLE</small><b id="final-deaths">0</b></div><div><small>KLEMMBÄNDER</small><b id="final-bands">0 / 12</b></div></div></div><button id="restart-button" class="button button--primary">NOCH EINE SCHICHT <b><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></b></button><button id="menu-button" class="button button--text">ZUM HAUPTMENÜ</button></div></section>
 
   <div id="touch-layer" class="touch-layer" aria-hidden="true">
-    <div id="touch-left" class="touch-zone touch-zone--left"><i class="pad">←</i></div>
-    <div id="touch-right" class="touch-zone touch-zone--right"><i class="pad">→</i></div>
+    <div id="touch-left" class="touch-zone touch-zone--left"><i class="pad"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5 7 12l7 7"/></svg></i></div>
+    <div id="touch-right" class="touch-zone touch-zone--right"><i class="pad"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5l7 7-7 7"/></svg></i></div>
     <div id="touch-jump" class="touch-zone touch-zone--jump"><i class="pad">SPRUNG</i></div>
   </div>
   <section id="rotate-hint" class="rotate-hint"><div>
-    <span class="rotate-hint__icon">▭</span>
+    <svg class="rotate-hint__icon" viewBox="0 0 64 64" aria-hidden="true"><rect x="21" y="6" width="22" height="40" rx="3"/><path d="M32 52v6M14 58h36"/></svg>
     <h2>BITTE QUER HALTEN</h2>
-    <p>Die Nachtschicht läuft im Querformat. Wenn sich das Bild nicht dreht, ist die Displaysperre deines Geräts aktiv.</p>
-    <p class="rotate-hint__hint">Displaysperre aktiv? Dann dreh das Bild hier — halte das Gerät anschließend quer.</p>
+    <p>Die Nachtschicht läuft im Querformat. Dreht sich das Bild nicht mit, ist die Displaysperre deines Geräts aktiv — dann dreh das Bild hier und halte das Gerät anschließend quer.</p>
     <div class="rotate-hint__actions">
-      <button id="rotate-anyway" class="button button--primary">NACH RECHTS ↻</button>
-      <button id="rotate-flip" class="button button--primary">↺ NACH LINKS</button>
+      <button id="rotate-anyway" class="button button--primary">NACH RECHTS<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 5v6h-6"/><path d="M20 11a8 8 0 1 0-2.3 5.3"/></svg></button>
+      <button id="rotate-flip" class="button button--primary"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5v6h6"/><path d="M4 11a8 8 0 1 1 2.3 5.3"/></svg>NACH LINKS</button>
     </div>
   </div></section>
   <div id="flash" class="flash"></div>
