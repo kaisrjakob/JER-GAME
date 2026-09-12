@@ -52,7 +52,9 @@ export class UnfairJeremias {
       'win-screen', 'final-score', 'final-time', 'final-deaths', 'final-bands', 'new-best',
       'restart-button', 'menu-button', 'section-card', 'section-kicker', 'section-title',
       'section-copy', 'callout', 'flash', 'touch-layer', 'touch-left', 'touch-right', 'touch-jump',
-      'rotate-hint', 'rotate-anyway', 'rotate-flip', 'rotate-reset-button'
+      'rotate-hint', 'rotate-anyway', 'rotate-flip', 'rotate-reset-button',
+      'install-bar', 'install-text', 'install-button', 'install-dismiss',
+      'update-bar', 'update-button'
     ];
     return Object.fromEntries(ids.map((id) => [camel(id), document.getElementById(id)]));
   }
@@ -60,7 +62,10 @@ export class UnfairJeremias {
   async boot() {
     this.bindUi();
     this.applyInputMode();
+    this.applyStandalone();
     this.applyRotation();
+    this.setupInstall();
+    this.registerWorker();
     this.ui.menuHighscore.textContent = formatScore(this.bestScore);
     this.ui.audioButton.classList.toggle('muted', this.settings.muted);
     try {
@@ -93,6 +98,90 @@ export class UnfairJeremias {
     addEventListener('keydown', (event) => {
       if (!event.metaKey && !event.ctrlKey && navigator.maxTouchPoints === 0) this.setInputMode('keyboard');
     }, { capture: true });
+  }
+
+  applyStandalone() {
+    const modes = ['fullscreen', 'standalone', 'minimal-ui'];
+    this.standalone = navigator.standalone === true
+      || modes.some((mode) => matchMedia('(display-mode: ' + mode + ')').matches);
+    document.documentElement.classList.toggle('standalone', this.standalone);
+    // Installiert erzwingt Android Querformat - eine gemerkte Drehung waere dann
+    // ein Zustand ohne Wirkung, aber mit abweichendem Panel-Look.
+    if (this.standalone && this.settings.rotate !== 'auto') {
+      this.settings.rotate = 'auto';
+      saveSettings(this.settings);
+    }
+  }
+
+  setupInstall() {
+    const bar = this.ui.installBar;
+    if (this.standalone || this.settings.installDismissed) return;
+    const short = () => document.documentElement.classList.contains('compact');
+    const show = (text, shortText, withButton) => {
+      this.ui.installText.textContent = short() ? shortText : text;
+      this.ui.installText.hidden = short() && withButton;
+      this.ui.installButton.hidden = !withButton;
+      bar.classList.add('install-bar--show');
+    };
+    this.ui.installDismiss.addEventListener('click', () => {
+      bar.classList.remove('install-bar--show');
+      this.settings.installDismissed = true;
+      saveSettings(this.settings);
+    });
+    addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      this.installPrompt = event;
+      show('Als App auf den Homescreen legen — startet im Vollbild und läuft offline.', '', true);
+    });
+    this.ui.installButton.addEventListener('click', async () => {
+      if (!this.installPrompt) return;
+      this.ui.installButton.disabled = true;
+      try {
+        await this.installPrompt.prompt();
+      } finally {
+        this.installPrompt = null;
+        bar.classList.remove('install-bar--show');
+      }
+    });
+    addEventListener('appinstalled', () => bar.classList.remove('install-bar--show'));
+    // Safari kennt beforeinstallprompt nicht, Firefox auf Android ebenso wenig.
+    // Nach kurzer Wartezeit bleibt nur die Anleitung - iPadOS meldet dabei eine
+    // Desktop-Kennung, deshalb entscheidet die Touch-Faehigkeit, nicht die Kennung.
+    setTimeout(() => {
+      if (this.installPrompt || bar.classList.contains('install-bar--show')) return;
+      if (navigator.maxTouchPoints > 0) {
+        show('Als App auf den Homescreen: im Browsermenü „Teilen" bzw. „⋮" öffnen und „Zum Home-Bildschirm" wählen.',
+             'Teilen-Menü, dann „Zum Home-Bildschirm" — macht daraus eine App.', false);
+      }
+    }, 2500);
+  }
+
+  async registerWorker() {
+    if (!navigator.serviceWorker || !isSecureContext) return;
+    try {
+      const registration = await navigator.serviceWorker.register('sw.js');
+      const offerUpdate = (worker) => {
+        if (!worker || !navigator.serviceWorker.controller) return;
+        this.ui.updateBar.classList.add('update-bar--show');
+        this.ui.updateButton.onclick = () => {
+          worker.postMessage({ type: 'SKIP_WAITING' });
+          this.ui.updateButton.disabled = true;
+        };
+      };
+      offerUpdate(registration.waiting);
+      registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        worker?.addEventListener('statechange', () => {
+          if (worker.state === 'installed') offerUpdate(worker);
+        });
+      });
+      let reloading = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (reloading) return;
+        reloading = true;
+        location.reload();
+      });
+    } catch { /* privater Modus, altes iOS: Spiel laeuft ohne Offline-Betrieb */ }
   }
 
   setInputMode(mode) {

@@ -6,7 +6,8 @@ const defaults = Object.freeze({
   muted: false,
   reducedMotion: false,
   rotate: 'auto',
-  quality: 'auto'
+  quality: 'auto',
+  installDismissed: false
 });
 
 function safeStorage() {
@@ -49,7 +50,8 @@ export function loadSettings() {
       muted: Boolean(value.muted),
       reducedMotion: Boolean(value.reducedMotion) || matchMedia('(prefers-reduced-motion: reduce)').matches,
       rotate: ['auto', 'cw', 'ccw'].includes(value.rotate) ? value.rotate : defaults.rotate,
-      quality: ['auto', 'low', 'medium', 'high'].includes(value.quality) ? value.quality : defaults.quality
+      quality: ['auto', 'low', 'medium', 'high'].includes(value.quality) ? value.quality : defaults.quality,
+      installDismissed: Boolean(value.installDismissed)
     };
   } catch {
     return { ...defaults };

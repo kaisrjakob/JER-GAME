@@ -66,6 +66,7 @@ export class UnfairRenderer {
     const root = document.documentElement.classList;
     root.toggle('short', this.height < 650);
     root.toggle('compact', this.height < 460);
+    root.toggle('tiny', this.height < 320);
     const backingWidth = Math.round(this.width * this.dpr);
     const backingHeight = Math.round(this.height * this.dpr);
     if (this.canvas.width === backingWidth && this.canvas.height === backingHeight) return;
